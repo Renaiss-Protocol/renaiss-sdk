@@ -606,6 +606,8 @@ export function GachaExample({
   const [revealedCardIds, setRevealedCardIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const walletAddressRef = useRef<string | null>(null);
+  const walletSetupStatusRef = useRef<WalletSetupStatus>('unknown');
   const restoredWalletSetupKeyRef = useRef<string | null>(null);
 
   const apiBaseUrl = apiConfig.baseUrl;
@@ -759,7 +761,7 @@ export function GachaExample({
   const loadAuthenticatedUser = useCallback(
     async (
       apiKeyValue: string,
-      walletAddressOverride = walletAddress,
+      walletAddressOverride?: string | null,
     ): Promise<AuthenticatedUser> => {
       const client = createSecureClient({
         ...clientConfig,
@@ -774,19 +776,19 @@ export function GachaExample({
       setSafeWalletAddress(authenticatedUser.wallets.safeWalletAddress);
 
       const provider = window.ethereum;
-      if (provider !== undefined && walletAddressOverride !== null) {
+      if (provider !== undefined && walletAddressOverride != null) {
         setSigner(createBrowserSigner(provider, walletAddressOverride));
       }
 
       return authenticatedUser;
     },
-    [clientConfig, walletAddress],
+    [clientConfig],
   );
 
   const refreshWalletSetupStatus = useCallback(
     async (
       apiKeyValue: string,
-      safeWalletAddressOverride = safeWalletAddress,
+      safeWalletAddressOverride: string | null = null,
     ): Promise<WalletSetupStatus> => {
       setWalletSetupStatus('checking');
       setStatus('Checking Safe wallet setup...');
@@ -814,8 +816,7 @@ export function GachaExample({
         throw new Error(formatApiError(getError(approvedResult)));
       }
 
-      const currentSafeWalletAddress =
-        safeWalletAddressOverride ?? safeWalletAddress;
+      const currentSafeWalletAddress = safeWalletAddressOverride;
       if (!getValue(approvedResult)) {
         setWalletSetupStatus('needsApproval');
         setStatus(
@@ -838,7 +839,7 @@ export function GachaExample({
       );
       return 'ready';
     },
-    [clientConfig, safeWalletAddress],
+    [clientConfig],
   );
 
   const loadPackDetail = useCallback(
@@ -919,6 +920,8 @@ export function GachaExample({
     },
     [secureClient],
   );
+  const loadBuybackOffersRef = useRef(loadBuybackOffers);
+  const loadUserActivitiesRef = useRef(loadUserActivities);
 
   const clearAuthenticatedSession = useCallback(
     (message: string) => {
@@ -980,6 +983,22 @@ export function GachaExample({
   }, [loadPackDetail, selectedSlug]);
 
   useEffect(() => {
+    walletAddressRef.current = walletAddress;
+  }, [walletAddress]);
+
+  useEffect(() => {
+    walletSetupStatusRef.current = walletSetupStatus;
+  }, [walletSetupStatus]);
+
+  useEffect(() => {
+    loadBuybackOffersRef.current = loadBuybackOffers;
+  }, [loadBuybackOffers]);
+
+  useEffect(() => {
+    loadUserActivitiesRef.current = loadUserActivities;
+  }, [loadUserActivities]);
+
+  useEffect(() => {
     const storedApiKey = readStoredApiKey(apiKeyStorageKey);
     if (storedApiKey !== null) {
       setApiKey(storedApiKey);
@@ -1001,6 +1020,8 @@ export function GachaExample({
     const walletProvider = provider;
     let isCurrent = true;
 
+    // Keep this effect independent from wallet setup state it mutates; otherwise
+    // restored-session checks can cancel themselves and leave the CTA checking.
     async function syncConnectedAccount() {
       try {
         const address = getFirstAccount(
@@ -1009,7 +1030,7 @@ export function GachaExample({
         if (!isCurrent) return;
 
         if (address === null) {
-          if (apiKey !== null || walletAddress !== null) {
+          if (apiKey !== null || walletAddressRef.current !== null) {
             markWalletUnavailable(
               'Wallet disconnected. Reconnect wallet to continue.',
             );
@@ -1031,7 +1052,7 @@ export function GachaExample({
             : `${apiKey}:${checksummedAddress.toLowerCase()}`;
         if (
           apiKey !== null &&
-          walletSetupStatus === 'unknown' &&
+          walletSetupStatusRef.current === 'unknown' &&
           restoredWalletSetupKeyRef.current !== setupKey
         ) {
           restoredWalletSetupKeyRef.current = setupKey;
@@ -1083,8 +1104,8 @@ export function GachaExample({
               signer: nextSigner,
             });
             await Promise.all([
-              loadBuybackOffers(restoredClient),
-              loadUserActivities(restoredClient),
+              loadBuybackOffersRef.current(restoredClient),
+              loadUserActivitiesRef.current(restoredClient),
             ]);
           } finally {
             if (isCurrent) {
@@ -1112,9 +1133,10 @@ export function GachaExample({
       }
 
       const checksummedAddress = getAddress(address);
+      const previousWalletAddress = walletAddressRef.current;
       if (
-        walletAddress !== null &&
-        checksummedAddress.toLowerCase() !== walletAddress.toLowerCase()
+        previousWalletAddress !== null &&
+        checksummedAddress.toLowerCase() !== previousWalletAddress.toLowerCase()
       ) {
         clearAuthenticatedSession('Wallet changed. Sign in again.');
       }
@@ -1132,7 +1154,7 @@ export function GachaExample({
       );
     }
 
-    if (apiKey !== null || walletAddress !== null) {
+    if (apiKey !== null) {
       void syncConnectedAccount();
     }
     walletProvider.on?.('accountsChanged', handleAccountsChanged);
@@ -1145,15 +1167,11 @@ export function GachaExample({
     };
   }, [
     apiKey,
-    walletAddress,
     clearAuthenticatedSession,
     clientConfig,
-    loadBuybackOffers,
     loadAuthenticatedUser,
-    loadUserActivities,
     markWalletUnavailable,
     refreshWalletSetupStatus,
-    walletSetupStatus,
   ]);
 
   async function connectWallet() {
@@ -1224,11 +1242,17 @@ export function GachaExample({
         signer: nextSigner,
       });
       persistApiKey(apiKeyStorageKey, key);
+      if (walletAddress !== null) {
+        restoredWalletSetupKeyRef.current = `${key}:${walletAddress.toLowerCase()}`;
+      }
       setPrimaryActionStatus('checkingSetup');
       setApiKey(key);
 
       try {
-        const authenticatedUser = await loadAuthenticatedUser(key);
+        const authenticatedUser = await loadAuthenticatedUser(
+          key,
+          walletAddress,
+        );
         await refreshWalletSetupStatus(
           key,
           authenticatedUser.wallets.safeWalletAddress,
