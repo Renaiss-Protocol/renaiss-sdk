@@ -49,7 +49,9 @@ export default async function Page() {
   return (
     <GachaExample
       apiConfig={{
-        baseUrl: process.env.NEXT_PUBLIC_RENAISS_API_URL,
+        baseUrl:
+          process.env.NEXT_PUBLIC_RENAISS_API_URL ??
+          process.env.RENAISS_API_URL,
       }}
       initialError={initialState.error}
       initialPacks={initialState.packs}
