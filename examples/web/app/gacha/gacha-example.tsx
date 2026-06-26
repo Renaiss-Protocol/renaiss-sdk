@@ -43,7 +43,13 @@ type GachaExampleProps = {
 type PullPhase = 'idle' | 'pulling' | 'ripVideo' | 'result';
 type AccountView = 'gacha' | 'activities' | 'offers';
 type ActivityViewFilter = 'all' | 'gacha' | 'buyback';
-type WalletSetupStatus = 'unknown' | 'checking' | 'signing' | 'ready' | 'error';
+type WalletSetupStatus =
+  | 'unknown'
+  | 'checking'
+  | 'deploying'
+  | 'signing'
+  | 'ready'
+  | 'error';
 type Eip1193EventProvider = EIP1193Provider & {
   on?: (event: string, listener: (payload: unknown) => void) => void;
   removeListener?: (
@@ -110,6 +116,7 @@ const quantityOptions = [
   GachaQuantity.Ten,
 ];
 
+const GACHA_MACHINE_CONTENTS_PAGE_SIZE = 100;
 const GACHA_API_KEY_STORAGE_PREFIX = 'renaiss:gacha-example:api-key';
 const accountViews: { label: string; value: AccountView }[] = [
   { label: 'Gacha', value: 'gacha' },
@@ -473,7 +480,7 @@ function formatTierLabel(tier: string): string {
 
 function formatChance(value: number): string {
   return `${new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 1,
+    maximumFractionDigits: value > 0 && value < 1 ? 2 : 1,
   }).format(value)}% chance`;
 }
 
@@ -682,7 +689,9 @@ export function GachaExample({
       : !isWalletReady
         ? walletSetupStatus === 'signing'
           ? 'Confirm wallet setup'
-          : 'Preparing wallet...'
+          : safeWalletAddress === null
+            ? 'Deploy Safe to rip'
+            : 'Prepare Safe to rip'
         : isPulling
           ? pullProgressMessage
           : isBusy
@@ -695,11 +704,27 @@ export function GachaExample({
         : `Safe ${compactAddress(safeWalletAddress)} ready`
       : walletSetupStatus === 'checking'
         ? 'Checking Safe setup'
-        : walletSetupStatus === 'signing'
-          ? 'Confirm Safe setup'
-          : walletSetupStatus === 'error'
-            ? 'Safe setup failed'
-            : 'Safe setup pending';
+        : walletSetupStatus === 'deploying'
+          ? 'Deploying Safe wallet'
+          : walletSetupStatus === 'signing'
+            ? 'Confirm Safe setup'
+            : walletSetupStatus === 'error'
+              ? 'Safe setup failed'
+              : !isAuthenticated
+                ? 'Safe setup pending'
+                : safeWalletAddress === null
+                  ? 'Deploy Safe to enable pulls'
+                  : `Safe ${compactAddress(safeWalletAddress)} needs setup`;
+  const walletSetupButtonText =
+    walletSetupStatus === 'ready'
+      ? 'Safe ready'
+      : walletSetupStatus === 'checking' ||
+          walletSetupStatus === 'deploying' ||
+          walletSetupStatus === 'signing'
+        ? 'Setting up Safe...'
+        : safeWalletAddress === null
+          ? 'Deploy Safe'
+          : 'Prepare Safe';
   const buybackSuccess = getBuybackSuccess(buybackFeedbackByCheckoutId);
 
   const ensureWalletReady = useCallback(
@@ -773,21 +798,26 @@ export function GachaExample({
         return;
       }
 
-      const contentsResult = await publicClient
-        .listGachaMachineContents({
-          pageSize: 100,
+      const contents: GachaMachineContent[] = [];
+
+      for await (const contentsPageResult of publicClient.listGachaMachineContents(
+        {
+          pageSize: GACHA_MACHINE_CONTENTS_PAGE_SIZE,
           slug,
-        })
-        .firstPage();
-      if (isFailed(contentsResult)) {
-        setMachineContents([]);
-        setPackError(formatApiError(getError(contentsResult)));
-        setPackDetail(getValue(result));
-        return;
+        },
+      )) {
+        if (isFailed(contentsPageResult)) {
+          setMachineContents([]);
+          setPackError(formatApiError(getError(contentsPageResult)));
+          setPackDetail(getValue(result));
+          return;
+        }
+
+        contents.push(...getValue(contentsPageResult).items);
       }
 
       setPackDetail(getValue(result));
-      setMachineContents(getValue(contentsResult).items);
+      setMachineContents(contents);
     },
     [publicClient],
   );
@@ -953,29 +983,20 @@ export function GachaExample({
             return;
           }
 
-          try {
-            await ensureWalletReady(apiKey, nextSigner);
-            const restoredClient = createSecureClient({
-              ...clientConfig,
-              apiKey,
-              signer: nextSigner,
-            });
-            await Promise.all([
-              loadBuybackOffers(restoredClient),
-              loadUserActivities(restoredClient),
-            ]);
-            if (isCurrent) {
-              setStatus(
-                `Restored session for ${compactAddress(checksummedAddress)}.`,
-              );
-            }
-          } catch (error) {
-            if (!isCurrent) return;
-            setWalletSetupStatus('error');
+          const restoredClient = createSecureClient({
+            ...clientConfig,
+            apiKey,
+            signer: nextSigner,
+          });
+          await Promise.all([
+            loadBuybackOffers(restoredClient),
+            loadUserActivities(restoredClient),
+          ]);
+          if (isCurrent) {
             setStatus(
-              error instanceof Error
-                ? `Wallet setup failed: ${error.message}`
-                : 'Wallet setup failed.',
+              `Restored session for ${compactAddress(
+                checksummedAddress,
+              )}. Prepare Safe wallet to enable pulls.`,
             );
           }
         }
@@ -1034,7 +1055,6 @@ export function GachaExample({
     walletAddress,
     clearAuthenticatedSession,
     clientConfig,
-    ensureWalletReady,
     loadBuybackOffers,
     loadAuthenticatedUser,
     loadUserActivities,
@@ -1109,21 +1129,15 @@ export function GachaExample({
         signer: nextSigner,
       });
       persistApiKey(apiKeyStorageKey, key);
-      setWalletSetupStatus('checking');
       setApiKey(key);
 
-      let nextStatus = 'Authenticated. Pulls and buybacks are enabled.';
+      let nextStatus = 'Authenticated. Deploy Safe wallet to enable pulls.';
       try {
         const authenticatedUser = await loadAuthenticatedUser(key);
-        const readySafeAddress = await ensureWalletReady(key, nextSigner);
-        if (readySafeAddress !== null) {
-          nextStatus = `Authenticated. Safe ${compactAddress(
-            readySafeAddress,
-          )} is ready for pulls and buybacks.`;
-        } else if (authenticatedUser.wallets.safeWalletAddress !== null) {
-          nextStatus = `Authenticated. Safe ${compactAddress(
+        if (authenticatedUser.wallets.safeWalletAddress !== null) {
+          nextStatus = `Authenticated. Prepare Safe ${compactAddress(
             authenticatedUser.wallets.safeWalletAddress,
-          )} is ready.`;
+          )} to enable pulls.`;
         }
         await Promise.all([
           loadBuybackOffers(nextClient),
@@ -1132,12 +1146,54 @@ export function GachaExample({
       } catch (error) {
         nextStatus =
           error instanceof Error
-            ? `Authenticated, but Safe setup failed: ${error.message}`
-            : 'Authenticated, but Safe setup failed.';
+            ? `Authenticated, but account sync failed: ${error.message}`
+            : 'Authenticated, but account sync failed.';
       }
       setStatus(nextStatus);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Sign in failed.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function deploySafeWalletForUser() {
+    if (secureClient === null || signer === null || apiKey === null) {
+      setStatus('Connect and sign in before deploying Safe wallet.');
+      return;
+    }
+
+    setIsBusy(true);
+    try {
+      setWalletSetupStatus('checking');
+      setStatus('Checking Safe wallet deployment...');
+      await ensureExpectedWalletChain();
+
+      setWalletSetupStatus('deploying');
+      setStatus('Confirm Safe deployment if your wallet asks.');
+      const deploymentResult = await secureClient.deploySafeWallet();
+      if (isFailed(deploymentResult)) {
+        setWalletSetupStatus('error');
+        setStatus(formatApiError(getError(deploymentResult)));
+        return;
+      }
+
+      const deployment = getValue(deploymentResult);
+      setSafeWalletAddress(deployment.safe.safeWalletAddress);
+
+      const readySafeAddress = await ensureWalletReady(apiKey, signer);
+      setStatus(
+        readySafeAddress === null
+          ? 'Safe wallet is ready for pulls and buybacks.'
+          : `Safe ${compactAddress(
+              readySafeAddress,
+            )} is ready for pulls and buybacks.`,
+      );
+    } catch (error) {
+      setWalletSetupStatus('error');
+      setStatus(
+        error instanceof Error ? error.message : 'Safe wallet setup failed.',
+      );
     } finally {
       setIsBusy(false);
     }
@@ -1617,6 +1673,19 @@ export function GachaExample({
                       type='button'
                     >
                       {apiKey === null ? 'Sign in' : 'Signed in'}
+                    </button>
+                    <button
+                      className={`${styles.secondaryButton} ${styles.safeSetupButton}`}
+                      disabled={
+                        isBusy ||
+                        secureClient === null ||
+                        signer === null ||
+                        walletSetupStatus === 'ready'
+                      }
+                      onClick={deploySafeWalletForUser}
+                      type='button'
+                    >
+                      {walletSetupButtonText}
                     </button>
                     <span className={styles.walletSetupStatus}>
                       {walletSetupLabel}
