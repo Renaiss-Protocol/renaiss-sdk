@@ -880,8 +880,27 @@ export function GachaExample({
     [apiKeyStorageKey],
   );
 
-  const disconnectWallet = useCallback(() => {
-    clearAuthenticatedSession('Wallet disconnected. Session cleared.');
+  const disconnectWallet = useCallback(async () => {
+    const provider = window.ethereum;
+    let didRevokeWalletPermission = false;
+
+    if (provider !== undefined) {
+      try {
+        await provider.request({
+          method: 'wallet_revokePermissions',
+          params: [{ eth_accounts: {} }],
+        });
+        didRevokeWalletPermission = true;
+      } catch {
+        // Some injected wallets do not support programmatic permission revokes.
+      }
+    }
+
+    clearAuthenticatedSession(
+      didRevokeWalletPermission
+        ? 'Wallet disconnected. Session cleared.'
+        : 'Session cleared. Revoke site access in your wallet if it still shows connected.',
+    );
     restoredWalletSetupKeyRef.current = null;
     setWalletAddress(null);
     setSigner(null);
