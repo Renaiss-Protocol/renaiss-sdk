@@ -1357,7 +1357,7 @@ export function GachaExample({
         authenticatedUser.wallets.safeWalletAddress,
       );
       if (nextWalletSetupStatus === 'ready') {
-        await pullGacha({ skipWalletReadyCheck: true });
+        await pullGacha();
         return;
       }
     } catch (error) {
@@ -1384,17 +1384,13 @@ export function GachaExample({
     }
   }
 
-  async function pullGacha(options: { skipWalletReadyCheck?: boolean } = {}) {
+  async function pullGacha() {
     if (secureClient === null || signer === null || apiKey === null) {
       setStatus('Connect and sign in before pulling.');
       return;
     }
     if (selectedSlug.length === 0) {
       setStatus('Select a gacha machine first.');
-      return;
-    }
-    if (!options.skipWalletReadyCheck && !isWalletReady) {
-      setStatus('Complete Safe wallet setup before ripping.');
       return;
     }
 
