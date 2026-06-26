@@ -20,6 +20,7 @@ import {
   type GachaMachine,
   type GachaMachineContent,
   GachaMachineContentsResponseSchema,
+  type GachaMachineDetail,
   GachaMachineResponseSchema,
   GachaMachineStage,
   GachaMachinesResponseSchema,
@@ -359,7 +360,7 @@ export function listGachaMachines(
 export function fetchGachaMachine(
   client: ServiceClient,
   request: FetchGachaMachineRequest,
-): Action<GachaMachine> {
+): Action<GachaMachineDetail> {
   const parsed = FetchGachaMachineRequestSchema.safeParse(request);
   if (!parsed.success) {
     return async () =>

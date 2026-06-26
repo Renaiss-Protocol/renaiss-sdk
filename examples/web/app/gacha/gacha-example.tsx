@@ -8,6 +8,8 @@ import {
   type GachaBuybackOffer,
   type GachaMachine,
   type GachaMachineContent,
+  type GachaMachineDetail,
+  type GachaMachineTier,
   type GachaPullResult,
   GachaQuantity,
   type GachaStreamEvent,
@@ -116,7 +118,7 @@ const quantityOptions = [
   GachaQuantity.Ten,
 ];
 
-const GACHA_MACHINE_CONTENTS_PAGE_SIZE = 100;
+const GACHA_MACHINE_CONTENTS_PREVIEW_PAGE_SIZE = 12;
 const GACHA_API_KEY_STORAGE_PREFIX = 'renaiss:gacha-example:api-key';
 const accountViews: { label: string; value: AccountView }[] = [
   { label: 'Gacha', value: 'gacha' },
@@ -456,15 +458,10 @@ function getActivityValue(activity: UserActivity): string {
 }
 
 type TierSummary = {
-  chancePercent: number;
-  count: number;
-  tier: string;
-  topBuybackBaseValueInUsd: string;
+  chance: GachaMachineTier['chance'];
+  name: string;
+  tier: number;
 };
-
-function parseNumericString(value: string): bigint {
-  return /^\d+$/.test(value) ? BigInt(value) : 0n;
-}
 
 function formatTierLabel(tier: string): string {
   if (tier.length === 1 || tier.toUpperCase() === 'TOP') {
@@ -478,51 +475,22 @@ function formatTierLabel(tier: string): string {
     .join(' ')}`;
 }
 
-function formatChance(value: number): string {
+function formatChance(value: GachaMachineTier['chance']): string {
+  if (value === 'UNDER-1-PERCENT') return 'Under 1% chance';
+
   return `${new Intl.NumberFormat('en-US', {
     maximumFractionDigits: value > 0 && value < 1 ? 2 : 1,
   }).format(value)}% chance`;
 }
 
-function summarizeTiers(contents: GachaMachineContent[]): TierSummary[] {
-  const summaries = new Map<string, TierSummary>();
-
-  for (const item of contents) {
-    const existing = summaries.get(item.tier);
-    if (existing === undefined) {
-      summaries.set(item.tier, {
-        chancePercent: 0,
-        count: 1,
-        tier: item.tier,
-        topBuybackBaseValueInUsd: item.buybackBaseValueInUsd,
-      });
-      continue;
-    }
-
-    existing.count += 1;
-    if (
-      parseNumericString(item.buybackBaseValueInUsd) >
-      parseNumericString(existing.topBuybackBaseValueInUsd)
-    ) {
-      existing.topBuybackBaseValueInUsd = item.buybackBaseValueInUsd;
-    }
-  }
-
-  const total = contents.length;
-
-  return [...summaries.values()]
-    .map((summary) => ({
-      ...summary,
-      chancePercent: total === 0 ? 0 : (summary.count / total) * 100,
+function summarizeTiers(tiers: GachaMachineTier[]): TierSummary[] {
+  return tiers
+    .map((tier) => ({
+      chance: tier.chance,
+      name: tier.name,
+      tier: tier.tier,
     }))
-    .sort((a, b) => {
-      const byTopValue =
-        parseNumericString(b.topBuybackBaseValueInUsd) -
-        parseNumericString(a.topBuybackBaseValueInUsd);
-      if (byTopValue !== 0n) return byTopValue > 0n ? 1 : -1;
-
-      return a.tier.localeCompare(b.tier);
-    });
+    .sort((a, b) => b.tier - a.tier);
 }
 
 function getActivityDestination(activity: UserActivity): string {
@@ -539,7 +507,7 @@ export function GachaExample({
 }: GachaExampleProps) {
   const [packs] = useState(initialPacks);
   const [selectedSlug, setSelectedSlug] = useState(initialPacks[0]?.slug ?? '');
-  const [packDetail, setPackDetail] = useState<GachaMachine | null>(null);
+  const [packDetail, setPackDetail] = useState<GachaMachineDetail | null>(null);
   const [machineContents, setMachineContents] = useState<GachaMachineContent[]>(
     [],
   );
@@ -659,8 +627,8 @@ export function GachaExample({
     });
   }, [previewContents, selectedPack?.slug]);
   const tierSummaries = useMemo(
-    () => summarizeTiers(machineContents),
-    [machineContents],
+    () => summarizeTiers(packDetail?.tiers ?? []),
+    [packDetail?.tiers],
   );
   const selectedPackTotalPrice =
     selectedPack === null
@@ -798,26 +766,21 @@ export function GachaExample({
         return;
       }
 
-      const contents: GachaMachineContent[] = [];
-
-      for await (const contentsPageResult of publicClient.listGachaMachineContents(
-        {
-          pageSize: GACHA_MACHINE_CONTENTS_PAGE_SIZE,
+      const contentsResult = await publicClient
+        .listGachaMachineContents({
+          pageSize: GACHA_MACHINE_CONTENTS_PREVIEW_PAGE_SIZE,
           slug,
-        },
-      )) {
-        if (isFailed(contentsPageResult)) {
-          setMachineContents([]);
-          setPackError(formatApiError(getError(contentsPageResult)));
-          setPackDetail(getValue(result));
-          return;
-        }
-
-        contents.push(...getValue(contentsPageResult).items);
+        })
+        .firstPage();
+      if (isFailed(contentsResult)) {
+        setMachineContents([]);
+        setPackError(formatApiError(getError(contentsResult)));
+        setPackDetail(getValue(result));
+        return;
       }
 
       setPackDetail(getValue(result));
-      setMachineContents(contents);
+      setMachineContents(getValue(contentsResult).items);
     },
     [publicClient],
   );
@@ -1737,21 +1700,19 @@ export function GachaExample({
                   <div className={styles.machineStatList}>
                     {tierSummaries.length === 0 ? (
                       <p className={styles.empty}>
-                        Tier breakdown appears after contents load.
+                        Tier breakdown appears after machine details load.
                       </p>
                     ) : (
                       tierSummaries.map((summary) => (
                         <div key={summary.tier}>
                           <span
                             className={`${styles.rarityDot} ${tierClassName(
-                              summary.tier,
+                              summary.name,
                             )}`}
                           />
-                          <strong>{formatTierLabel(summary.tier)}</strong>
-                          <small>
-                            {formatUsd(summary.topBuybackBaseValueInUsd)} top
-                          </small>
-                          <b>{formatChance(summary.chancePercent)}</b>
+                          <strong>{formatTierLabel(summary.name)}</strong>
+                          <small>Tier #{summary.tier}</small>
+                          <b>{formatChance(summary.chance)}</b>
                         </div>
                       ))
                     )}

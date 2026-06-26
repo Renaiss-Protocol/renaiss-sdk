@@ -22,12 +22,40 @@ export enum GachaQuantity {
   Ten = 10,
 }
 
+export enum GachaMachineTierName {
+  Top = 'TOP',
+  S = 'S',
+  A = 'A',
+  B = 'B',
+  C = 'C',
+  D = 'D',
+  Epic = 'epic',
+  Rare = 'rare',
+  Uncommon = 'uncommon',
+  Common = 'common',
+  Legendary = 'legendary',
+  Thorn = 'thorn',
+  Bloom = 'bloom',
+  Crown = 'crown',
+}
+
 export const SupportedGachaMachineTypeSchema = z.literal(GachaMachineType.V3);
 export const GachaQuantitySchema = z.union([
   z.literal(GachaQuantity.Single),
   z.literal(GachaQuantity.Five),
   z.literal(GachaQuantity.Ten),
 ]);
+export const GachaMachineTierChanceSchema = z.union([
+  z.number(),
+  z.literal('UNDER-1-PERCENT'),
+]);
+export const GachaMachineTierSchema = z.object({
+  tier: z.number().int(),
+  name: z.enum(GachaMachineTierName),
+  chance: GachaMachineTierChanceSchema,
+});
+
+export type GachaMachineTier = z.infer<typeof GachaMachineTierSchema>;
 
 export const GachaMachineSchema = z.object({
   slug: z.string(),
@@ -45,6 +73,12 @@ export const GachaMachineSchema = z.object({
 });
 
 export type GachaMachine = z.infer<typeof GachaMachineSchema>;
+
+export const GachaMachineDetailSchema = GachaMachineSchema.extend({
+  tiers: z.array(GachaMachineTierSchema),
+});
+
+export type GachaMachineDetail = z.infer<typeof GachaMachineDetailSchema>;
 
 export const GachaMachineContentSchema = z.object({
   name: z.string(),
@@ -68,7 +102,7 @@ export const GachaMachinesResponseSchema = z.object({
 });
 
 export const GachaMachineResponseSchema = z.object({
-  cardPack: GachaMachineSchema,
+  cardPack: GachaMachineDetailSchema,
 });
 
 export const GachaMachineContentsResponseSchema = z.object({

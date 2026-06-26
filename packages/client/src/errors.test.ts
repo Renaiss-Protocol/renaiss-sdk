@@ -112,6 +112,7 @@ describe('error guards', () => {
     expect(isFetchGachaMachineError(apiError('CARD_PACK_NOT_FOUND'))).toBe(
       true,
     );
+    expect(isFetchGachaMachineError(apiError('FUNCTION_ERROR'))).toBe(true);
   });
 
   it('keeps generated gacha route codes in sync with the OpenAPI types', () => {
