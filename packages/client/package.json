@@ -1,0 +1,67 @@
+{
+  "name": "@renaiss-protocol/client",
+  "version": "0.1.0-alpha.1",
+  "description": "The Renaiss TypeScript client",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Renaiss-Protocol/renaiss-sdk",
+    "directory": "packages/client"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./viem": {
+      "types": "./dist/viem.d.ts",
+      "default": "./dist/viem.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "viem": [
+        "./dist/viem.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "fp-ts": "^2.16.9",
+    "http-status-codes": "^2.3.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@renaiss-protocol/bindings": "workspace:*",
+    "@renaiss-protocol/error-codes": "workspace:*",
+    "@renaiss-protocol/fp": "workspace:*",
+    "@renaiss-protocol/schema-validation": "workspace:*",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2",
+    "viem": "^2.53.1"
+  },
+  "peerDependencies": {
+    "viem": "^2.53.1"
+  },
+  "peerDependenciesMeta": {
+    "viem": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

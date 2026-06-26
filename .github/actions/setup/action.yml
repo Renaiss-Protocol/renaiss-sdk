@@ -1,0 +1,21 @@
+name: Setup
+description: Setup repo tooling and install dependencies
+
+runs:
+  using: composite
+  steps:
+    - name: Set Up pnpm
+      uses: pnpm/action-setup@v6
+      with:
+        version: 10.33.0
+        run_install: false
+
+    - name: Set Up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install Dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

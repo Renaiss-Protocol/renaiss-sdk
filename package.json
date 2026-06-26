@@ -1,0 +1,40 @@
+{
+  "name": "renaiss-sdk",
+  "version": "0.0.0",
+  "description": "Renaiss SDK monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "pnpm -r --sort --if-present run build",
+    "changeset": "changeset",
+    "clean": "rimraf packages/*/dist",
+    "release": "pnpm build && changeset publish --no-git-tag",
+    "release:canary": "changeset publish --tag canary --no-git-tag",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "pnpm -r --sort --if-present run typecheck",
+    "version:bump": "changeset version",
+    "version:canary": "changeset version --snapshot canary",
+    "lint": "biome check",
+    "lint:fix": "biome check --write"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.9",
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "^25.5.0",
+    "msw": "^2.11.5",
+    "rimraf": "^6.1.3",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3",
+    "vitest": "4.1.2"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

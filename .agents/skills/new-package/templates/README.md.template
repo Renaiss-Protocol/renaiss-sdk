@@ -1,0 +1,31 @@
+# `@renaiss-protocol/{{PACKAGE_NAME}}`
+
+The `@renaiss-protocol/{{PACKAGE_NAME}}` package is {{PACKAGE_DESCRIPTION}}.
+
+## Status
+
+This package is currently scaffolded and does not yet expose a public API beyond the base entrypoint.
+
+## Installation
+
+```bash
+pnpm add @renaiss-protocol/{{PACKAGE_NAME}}
+```
+
+## Usage
+
+```ts
+import {} from '@renaiss-protocol/{{PACKAGE_NAME}}';
+```
+
+## Development
+
+From the monorepo root:
+
+```bash
+pnpm --filter @renaiss-protocol/{{PACKAGE_NAME}} build
+```
+
+## License
+
+MIT

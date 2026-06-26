@@ -1,0 +1,52 @@
+name: Bug report
+description: Report broken behavior, install failures, regressions, or incorrect TypeScript behavior.
+title: "[Bug]: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug in the TypeScript SDK.
+
+        Please do not report security vulnerabilities in public issues.
+  - type: input
+    id: package-version
+    attributes:
+      label: SDK package and version
+      description: Include the package name and version from your package manager.
+      placeholder: "@renaiss-protocol/client@0.1.0-beta.0"
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Include your Node.js version, browser/runtime if relevant, and package manager/version.
+      placeholder: "Node.js 24.14.0, pnpm 10.33.0"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the broken behavior or regression.
+      placeholder: "The SDK throws when..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest code sample or steps that reproduce the issue.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected behavior, actual behavior, or logs
+      description: Add expected behavior, actual behavior, errors, or logs if helpful.
+    validations:
+      required: false

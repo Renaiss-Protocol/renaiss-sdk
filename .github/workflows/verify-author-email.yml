@@ -1,0 +1,69 @@
+name: Verify Commit Author
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-author:
+    name: Verify commit authors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check email domains & author identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          ALLOWED_DOMAINS="@renaiss.xyz"
+          ERRORS=""
+
+          # Get PR commits via GitHub API — includes the resolved GitHub user for each commit
+          COMMITS=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/commits" --paginate --jq '.[] | {sha: .sha, git_author: .commit.author.name, git_email: .commit.author.email, gh_user: (.author.login // "unresolved")}')
+
+          while IFS= read -r line; do
+            SHA=$(echo "$line" | jq -r '.sha')
+            GIT_AUTHOR=$(echo "$line" | jq -r '.git_author')
+            GIT_EMAIL=$(echo "$line" | jq -r '.git_email')
+            GH_USER=$(echo "$line" | jq -r '.gh_user')
+            SHORT_SHA="${SHA:0:7}"
+
+            # Check 1: email domain
+            DOMAIN_OK=false
+            for domain in $ALLOWED_DOMAINS; do
+              if [[ "$GIT_EMAIL" == *"$domain" ]]; then
+                DOMAIN_OK=true
+                break
+              fi
+            done
+
+            if [[ "$DOMAIN_OK" == "false" ]]; then
+              ERRORS="$ERRORS\n  ❌ ${SHORT_SHA} — bad email domain ($GIT_AUTHOR <$GIT_EMAIL>)"
+            fi
+
+            # Check 2: commit email must resolve to a known GitHub account
+            if [[ "$GH_USER" == "unresolved" ]]; then
+              ERRORS="$ERRORS\n  ❌ ${SHORT_SHA} — email <$GIT_EMAIL> not linked to any GitHub account"
+            fi
+          done < <(echo "$COMMITS" | jq -c '.')
+
+          if [[ -n "$ERRORS" ]]; then
+            echo "::error::Commit author verification failed:"
+            echo -e "$ERRORS"
+            echo ""
+            echo "Rules:"
+            echo "  1. Author email must be from: $ALLOWED_DOMAINS"
+            echo "  2. Author email must be linked to your GitHub account"
+            echo ""
+            echo "Fix: git config user.email your-name@renaiss.xyz"
+            echo "     Make sure that email is added in GitHub → Settings → Emails"
+            exit 1
+          fi
+
+          echo "✅ All commits have valid email domains and linked GitHub accounts"

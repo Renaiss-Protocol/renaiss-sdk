@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: Run
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up Repository
+        uses: ./.github/actions/setup
+
+      - name: Test
+        run: pnpm test

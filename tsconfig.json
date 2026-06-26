@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@renaiss-protocol/bindings": ["./packages/bindings/src"],
+      "@renaiss-protocol/bindings/api": ["./packages/bindings/api"],
+      "@renaiss-protocol/client": ["./packages/client/src"],
+      "@renaiss-protocol/client/viem": ["./packages/client/src/viem"],
+      "@renaiss-protocol/error-codes": ["./packages/error-codes/src"],
+      "@renaiss-protocol/fp": ["./packages/fp/src"],
+      "@renaiss-protocol/schema-validation": [
+        "./packages/schema-validation/src"
+      ]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["dist", "node_modules"]
+}

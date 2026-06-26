@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+# id-token: write enables npm Trusted Publishing (OIDC) — no NPM_TOKEN secret is
+# stored; npm verifies the GitHub OIDC token against the package's configured
+# trusted publisher and attaches provenance automatically.
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+
+  test:
+    name: Tests
+    needs: verify
+    uses: ./.github/workflows/tests.yml
+
+  changesets:
+    name: Changesets
+    runs-on: ubuntu-latest
+    needs:
+      - verify
+      - test
+    # `release` is a protected GitHub Environment: configure it with required
+    # reviewers = the Deployer team so a human deployer must approve before any
+    # npm publish runs.
+    environment: release
+
+    steps:
+      # Only members of the Deployer team (vars.DEPLOYER_LOGINS, a comma-separated
+      # list of GitHub logins) may trigger an npm publish. Mirrors the gate used
+      # in renaiss-review's deploy-production workflow.
+      - name: Authorize actor (Deployer team)
+        env:
+          ALLOWED: ${{ vars.DEPLOYER_LOGINS }}
+        run: |
+          if ! printf '%s' "$ALLOWED" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -Fxq "${{ github.actor }}"; then
+            echo "::error::${{ github.actor }} is not in vars.DEPLOYER_LOGINS (the Deployer team); only they may publish to npm."
+            exit 1
+          fi
+          echo "✅ ${{ github.actor }} authorized"
+
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up Repository
+        uses: ./.github/actions/setup
+
+      - name: Create Or Update Release PR / Publish
+        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
+        with:
+          version: pnpm version:bump
+          publish: pnpm release
+          title: '[Release] Candidate'
+          commit: 'chore: bumps package versions'
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  canary:
+    name: Publish Canary
+    runs-on: ubuntu-latest
+    needs:
+      - verify
+      - test
+    environment: release
+    if: "${{ !contains(github.event.head_commit.message, 'chore: bumps package versions') }}"
+
+    steps:
+      - name: Authorize actor (Deployer team)
+        env:
+          ALLOWED: ${{ vars.DEPLOYER_LOGINS }}
+        run: |
+          if ! printf '%s' "$ALLOWED" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -Fxq "${{ github.actor }}"; then
+            echo "::error::${{ github.actor }} is not in vars.DEPLOYER_LOGINS (the Deployer team); only they may publish to npm."
+            exit 1
+          fi
+          echo "✅ ${{ github.actor }} authorized"
+
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up Repository
+        uses: ./.github/actions/setup
+
+      - name: Version Packages For Canary
+        run: pnpm version:canary
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish Canary Packages
+        run: pnpm release:canary

@@ -1,0 +1,51 @@
+{
+  "name": "@renaiss-protocol/bindings",
+  "version": "0.1.0-beta.0",
+  "private": true,
+  "description": "Internal package containing generated Renaiss API bindings.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Renaiss-Protocol/renaiss-sdk",
+    "directory": "packages/bindings"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "default": "./dist/api/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "api": [
+        "./dist/api/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "generate": "pnpm generate:api && pnpm generate:error-codes",
+    "generate:api": "openapi-typescript ${RENAISS_OPENAPI_SOURCE:-https://api.renaiss.xyz/openapi.json} -o api/generated.ts",
+    "generate:error-codes": "node scripts/generate-error-codes.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2"
+  },
+  "license": "MIT"
+}
