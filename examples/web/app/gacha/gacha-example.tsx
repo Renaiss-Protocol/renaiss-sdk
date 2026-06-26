@@ -45,6 +45,12 @@ type GachaExampleProps = {
 type PullPhase = 'idle' | 'pulling' | 'ripVideo' | 'result';
 type AccountView = 'gacha' | 'activities' | 'offers';
 type ActivityViewFilter = 'all' | 'gacha' | 'buyback';
+type PrimaryActionStatus =
+  | 'idle'
+  | 'checkingSetup'
+  | 'deployingSafe'
+  | 'approvingPermit2'
+  | 'ripping';
 type WalletSetupStatus =
   | 'unknown'
   | 'checking'
@@ -495,6 +501,61 @@ function summarizeTiers(tiers: GachaMachineTier[]): TierSummary[] {
     .sort((a, b) => b.tier - a.tier);
 }
 
+function getPrimaryActionText(input: {
+  isPulling: boolean;
+  isWalletReady: boolean;
+  primaryActionStatus: PrimaryActionStatus;
+  pullProgressMessage: string;
+  selectedPackTotalPrice: string | null | undefined;
+  secureClient: ReturnType<typeof createSecureClient> | null;
+  walletSetupStatus: WalletSetupStatus;
+  quantity: GachaQuantity;
+}): string {
+  if (input.secureClient === null) return 'Connect wallet to rip';
+
+  switch (input.primaryActionStatus) {
+    case 'checkingSetup':
+      return 'Checking Safe...';
+    case 'deployingSafe':
+      return 'Confirm Safe deployment';
+    case 'approvingPermit2':
+      return 'Confirm Permit2 approval';
+    case 'ripping':
+      return input.isPulling
+        ? input.pullProgressMessage
+        : 'Confirm wallet signature';
+    case 'idle':
+      break;
+  }
+
+  if (!input.isWalletReady) {
+    switch (input.walletSetupStatus) {
+      case 'checking':
+        return 'Checking Safe...';
+      case 'deploying':
+        return 'Confirm Safe deployment';
+      case 'needsApproval':
+        return 'Approve Permit2';
+      case 'approving':
+        return 'Confirm Permit2 approval';
+      case 'error':
+        return 'Check Safe setup';
+      case 'unknown':
+        return 'Check Safe setup';
+      case 'needsDeployment':
+        return 'Deploy Safe';
+      case 'ready':
+        break;
+    }
+  }
+
+  if (input.isPulling) return input.pullProgressMessage;
+
+  return `Rip ${input.quantity}x for ${formatUsdtPrice(
+    input.selectedPackTotalPrice,
+  )}`;
+}
+
 function getActivityDestination(activity: UserActivity): string {
   if (gachaPullActivityTypes.has(activity.type)) return 'Gacha';
   if (buybackActivityTypes.has(activity.type)) return 'Buyback';
@@ -533,6 +594,8 @@ export function GachaExample({
   const [offerSearch, setOfferSearch] = useState('');
   const [status, setStatus] = useState('Ready to browse gacha machines.');
   const [isBusy, setIsBusy] = useState(false);
+  const [primaryActionStatus, setPrimaryActionStatus] =
+    useState<PrimaryActionStatus>('idle');
   const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
   const [isOffersLoading, setIsOffersLoading] = useState(false);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
@@ -639,6 +702,10 @@ export function GachaExample({
   const isWalletConnected = walletAddress !== null;
   const isAuthenticated = apiKey !== null;
   const isWalletReady = walletSetupStatus === 'ready';
+  const isWalletSetupInFlight =
+    walletSetupStatus === 'checking' ||
+    walletSetupStatus === 'deploying' ||
+    walletSetupStatus === 'approving';
   const resultCards =
     pullResult?.released.map((item) => ({
       item,
@@ -653,28 +720,16 @@ export function GachaExample({
   const selectedInstantBuybackPercentage = 85;
   const isPulling = pullPhase === 'pulling';
   const pullProgressMessage = getPullProgressMessage(streamEvents);
-  const pullButtonText =
-    secureClient === null
-      ? 'Connect wallet to rip'
-      : !isWalletReady
-        ? walletSetupStatus === 'checking'
-          ? isBusy
-            ? 'Preparing rip...'
-            : 'Checking Safe...'
-          : walletSetupStatus === 'deploying'
-            ? 'Confirm Safe deployment'
-            : walletSetupStatus === 'needsApproval'
-              ? 'Approve Permit2'
-              : walletSetupStatus === 'approving'
-                ? 'Confirm Permit2 approval'
-                : walletSetupStatus === 'error'
-                  ? 'Check Safe setup'
-                  : 'Deploy Safe'
-        : isPulling
-          ? pullProgressMessage
-          : isBusy
-            ? 'Processing...'
-            : `Rip ${quantity}x for ${formatUsdtPrice(selectedPackTotalPrice)}`;
+  const pullButtonText = getPrimaryActionText({
+    isPulling,
+    isWalletReady,
+    primaryActionStatus,
+    pullProgressMessage,
+    quantity,
+    secureClient,
+    selectedPackTotalPrice,
+    walletSetupStatus,
+  });
   const walletSetupLabel =
     walletSetupStatus === 'ready'
       ? safeWalletAddress === null
@@ -873,6 +928,7 @@ export function GachaExample({
       setUserActivities([]);
       setBuybackFeedbackByCheckoutId({});
       setSafeWalletAddress(null);
+      setPrimaryActionStatus('idle');
       setWalletSetupStatus('unknown');
       setPullResult(null);
       setPullPhase('idle');
@@ -914,6 +970,7 @@ export function GachaExample({
     setWalletAddress(null);
     setSigner(null);
     setSafeWalletAddress(null);
+    setPrimaryActionStatus('idle');
     setWalletSetupStatus('unknown');
     setStatus(message);
   }, []);
@@ -978,53 +1035,62 @@ export function GachaExample({
           restoredWalletSetupKeyRef.current !== setupKey
         ) {
           restoredWalletSetupKeyRef.current = setupKey;
-          let restoredSafeWalletAddress: string | null = null;
+          setPrimaryActionStatus('checkingSetup');
+          setWalletSetupStatus('checking');
           try {
-            const authenticatedUser = await loadAuthenticatedUser(
-              apiKey,
-              checksummedAddress,
-            );
-            restoredSafeWalletAddress =
-              authenticatedUser.wallets.safeWalletAddress;
-          } catch (error) {
-            if (!isCurrent) return;
-            if (isSessionExpiredError(error)) {
-              clearAuthenticatedSession(
-                error instanceof Error
-                  ? `Stored session expired: ${error.message}`
-                  : 'Stored session expired.',
+            let restoredSafeWalletAddress: string | null = null;
+            try {
+              const authenticatedUser = await loadAuthenticatedUser(
+                apiKey,
+                checksummedAddress,
               );
-            } else {
+              restoredSafeWalletAddress =
+                authenticatedUser.wallets.safeWalletAddress;
+            } catch (error) {
+              if (!isCurrent) return;
+              if (isSessionExpiredError(error)) {
+                clearAuthenticatedSession(
+                  error instanceof Error
+                    ? `Stored session expired: ${error.message}`
+                    : 'Stored session expired.',
+                );
+              } else {
+                setWalletSetupStatus('error');
+                setStatus(
+                  error instanceof Error
+                    ? `Session check failed: ${error.message}`
+                    : 'Session check failed.',
+                );
+              }
+              return;
+            }
+
+            try {
+              await refreshWalletSetupStatus(apiKey, restoredSafeWalletAddress);
+            } catch (error) {
+              if (!isCurrent) return;
+              setWalletSetupStatus('error');
               setStatus(
                 error instanceof Error
-                  ? `Session check failed: ${error.message}`
-                  : 'Session check failed.',
+                  ? `Wallet setup check failed: ${error.message}`
+                  : 'Wallet setup check failed.',
               );
             }
-            return;
-          }
 
-          try {
-            await refreshWalletSetupStatus(apiKey, restoredSafeWalletAddress);
-          } catch (error) {
-            if (!isCurrent) return;
-            setWalletSetupStatus('error');
-            setStatus(
-              error instanceof Error
-                ? `Wallet setup check failed: ${error.message}`
-                : 'Wallet setup check failed.',
-            );
+            const restoredClient = createSecureClient({
+              ...clientConfig,
+              apiKey,
+              signer: nextSigner,
+            });
+            await Promise.all([
+              loadBuybackOffers(restoredClient),
+              loadUserActivities(restoredClient),
+            ]);
+          } finally {
+            if (isCurrent) {
+              setPrimaryActionStatus('idle');
+            }
           }
-
-          const restoredClient = createSecureClient({
-            ...clientConfig,
-            apiKey,
-            signer: nextSigner,
-          });
-          await Promise.all([
-            loadBuybackOffers(restoredClient),
-            loadUserActivities(restoredClient),
-          ]);
         }
       } catch (error) {
         if (!isCurrent) return;
@@ -1055,6 +1121,7 @@ export function GachaExample({
       restoredWalletSetupKeyRef.current = null;
       setWalletAddress(checksummedAddress);
       setSafeWalletAddress(null);
+      setPrimaryActionStatus('idle');
       setWalletSetupStatus('unknown');
       setSigner(createBrowserSigner(walletProvider, checksummedAddress));
     }
@@ -1118,6 +1185,7 @@ export function GachaExample({
       restoredWalletSetupKeyRef.current = null;
       setWalletAddress(checksummedAddress);
       setSafeWalletAddress(null);
+      setPrimaryActionStatus('idle');
       setWalletSetupStatus('unknown');
       setSigner(createBrowserSigner(provider, checksummedAddress));
       setStatus(`Connected ${compactAddress(checksummedAddress)}.`);
@@ -1156,6 +1224,7 @@ export function GachaExample({
         signer: nextSigner,
       });
       persistApiKey(apiKeyStorageKey, key);
+      setPrimaryActionStatus('checkingSetup');
       setApiKey(key);
 
       try {
@@ -1179,6 +1248,7 @@ export function GachaExample({
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Sign in failed.');
     } finally {
+      setPrimaryActionStatus('idle');
       setIsBusy(false);
     }
   }
@@ -1189,6 +1259,7 @@ export function GachaExample({
       return;
     }
 
+    setPrimaryActionStatus('deployingSafe');
     setIsBusy(true);
     try {
       await ensureExpectedWalletChain();
@@ -1203,6 +1274,7 @@ export function GachaExample({
 
       const deployment = getValue(deploymentResult);
       setSafeWalletAddress(deployment.safe.safeWalletAddress);
+      setPrimaryActionStatus('checkingSetup');
       await refreshWalletSetupStatus(apiKey, deployment.safe.safeWalletAddress);
     } catch (error) {
       setWalletSetupStatus('error');
@@ -1212,6 +1284,7 @@ export function GachaExample({
           : 'Safe wallet deployment failed.',
       );
     } finally {
+      setPrimaryActionStatus('idle');
       setIsBusy(false);
     }
   }
@@ -1222,6 +1295,7 @@ export function GachaExample({
       return;
     }
 
+    setPrimaryActionStatus('approvingPermit2');
     setIsBusy(true);
     try {
       await ensureExpectedWalletChain();
@@ -1248,6 +1322,7 @@ export function GachaExample({
         error instanceof Error ? error.message : 'Permit2 approval failed.',
       );
     } finally {
+      setPrimaryActionStatus('idle');
       setIsBusy(false);
     }
   }
@@ -1273,6 +1348,7 @@ export function GachaExample({
       return;
     }
 
+    setPrimaryActionStatus('checkingSetup');
     setIsBusy(true);
     try {
       const authenticatedUser = await loadAuthenticatedUser(apiKey);
@@ -1292,6 +1368,7 @@ export function GachaExample({
           : 'Wallet setup check failed.',
       );
     } finally {
+      setPrimaryActionStatus('idle');
       setIsBusy(false);
     }
   }
@@ -1321,6 +1398,7 @@ export function GachaExample({
       return;
     }
 
+    setPrimaryActionStatus('ripping');
     setIsBusy(true);
     setPullResult(null);
     setBuybackFeedbackByCheckoutId({});
@@ -1385,6 +1463,7 @@ export function GachaExample({
       setStatus(error instanceof Error ? error.message : 'Pull failed.');
       setPullPhase('idle');
     } finally {
+      setPrimaryActionStatus('idle');
       setIsBusy(false);
     }
   }
@@ -1817,7 +1896,8 @@ export function GachaExample({
                       isBusy ||
                       secureClient === null ||
                       signer === null ||
-                      walletSetupStatus === 'checking'
+                      primaryActionStatus !== 'idle' ||
+                      isWalletSetupInFlight
                     }
                     onClick={handlePrimaryGachaAction}
                     type='button'
