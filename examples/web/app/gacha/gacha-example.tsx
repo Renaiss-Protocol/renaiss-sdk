@@ -658,7 +658,9 @@ export function GachaExample({
       ? 'Connect wallet to rip'
       : !isWalletReady
         ? walletSetupStatus === 'checking'
-          ? 'Checking Safe...'
+          ? isBusy
+            ? 'Preparing rip...'
+            : 'Checking Safe...'
           : walletSetupStatus === 'deploying'
             ? 'Confirm Safe deployment'
             : walletSetupStatus === 'needsApproval'
@@ -1271,12 +1273,17 @@ export function GachaExample({
       return;
     }
 
+    setIsBusy(true);
     try {
       const authenticatedUser = await loadAuthenticatedUser(apiKey);
-      await refreshWalletSetupStatus(
+      const nextWalletSetupStatus = await refreshWalletSetupStatus(
         apiKey,
         authenticatedUser.wallets.safeWalletAddress,
       );
+      if (nextWalletSetupStatus === 'ready') {
+        await pullGacha({ skipWalletReadyCheck: true });
+        return;
+      }
     } catch (error) {
       setWalletSetupStatus('error');
       setStatus(
@@ -1284,6 +1291,8 @@ export function GachaExample({
           ? `Wallet setup check failed: ${error.message}`
           : 'Wallet setup check failed.',
       );
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -1298,7 +1307,7 @@ export function GachaExample({
     }
   }
 
-  async function pullGacha() {
+  async function pullGacha(options: { skipWalletReadyCheck?: boolean } = {}) {
     if (secureClient === null || signer === null || apiKey === null) {
       setStatus('Connect and sign in before pulling.');
       return;
@@ -1307,7 +1316,7 @@ export function GachaExample({
       setStatus('Select a gacha machine first.');
       return;
     }
-    if (!isWalletReady) {
+    if (!options.skipWalletReadyCheck && !isWalletReady) {
       setStatus('Complete Safe wallet setup before ripping.');
       return;
     }
@@ -2321,7 +2330,9 @@ export function GachaExample({
                   <button
                     className={styles.primaryButton}
                     disabled={isBusy || secureClient === null}
-                    onClick={pullGacha}
+                    onClick={() => {
+                      void pullGacha();
+                    }}
                     type='button'
                   >
                     Rip again
@@ -2380,7 +2391,9 @@ export function GachaExample({
                   <button
                     className={styles.primaryButton}
                     disabled={isBusy || secureClient === null}
-                    onClick={pullGacha}
+                    onClick={() => {
+                      void pullGacha();
+                    }}
                     type='button'
                   >
                     Rip Another Pack For{' '}
