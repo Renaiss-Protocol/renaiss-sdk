@@ -1394,19 +1394,13 @@
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
 }
 
 .machineStatList strong,
 .machineStatList b {
   color: #ffffff;
   font-size: 0.78rem;
-}
-
-.machineStatList small {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
 }
 
 .rarityDot {

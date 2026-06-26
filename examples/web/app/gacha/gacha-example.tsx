@@ -1819,7 +1819,6 @@ export function GachaExample({
                             )}`}
                           />
                           <strong>{formatTierLabel(summary.name)}</strong>
-                          <small>Tier #{summary.tier}</small>
                           <b>{formatChance(summary.chance)}</b>
                         </div>
                       ))
