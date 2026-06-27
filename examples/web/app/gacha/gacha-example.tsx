@@ -832,7 +832,7 @@ export function GachaExample({
       setWalletSetupStatus('ready');
       setStatus(
         currentSafeWalletAddress === null
-          ? 'Safe wallet is ready for pulls and buybacks.'
+          ? 'Safe wallet setup complete. Ready for pulls and buybacks.'
           : `Safe ${compactAddress(
               currentSafeWalletAddress,
             )} is ready for pulls and buybacks.`,
