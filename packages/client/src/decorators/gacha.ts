@@ -3,6 +3,7 @@ import type {
   GachaBuybackOffer,
   GachaMachine,
   GachaMachineContent,
+  GachaMachineDetail,
   GachaPullResult,
   GachaStreamEvent,
   SubmitGachaBuybackResponse,
@@ -43,12 +44,12 @@ export type PublicGachaActions = {
    *
    * @remarks
    * Returns `CARD_PACK_NOT_FOUND`, `CARD_PACKS_QUERY_FAILED`,
-   * `WRONG_REQUEST_PARAMS`, `INVALID_SCHEMA`, or `UNKNOWN_ERROR` as a
-   * `Result`; expected failures are not thrown.
+   * `FUNCTION_ERROR`, `WRONG_REQUEST_PARAMS`, `INVALID_SCHEMA`, or
+   * `UNKNOWN_ERROR` as a `Result`; expected failures are not thrown.
    */
   fetchGachaMachine(
     request: FetchGachaMachineRequest,
-  ): Promise<Result<GachaMachine>>;
+  ): Promise<Result<GachaMachineDetail>>;
 
   /**
    * Lists display-safe card contents for one gacha machine.

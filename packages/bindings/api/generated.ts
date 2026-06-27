@@ -566,6 +566,11 @@ export interface paths {
                                 packBannerVideoUrl: string | null;
                                 gachaMachineVideoUrl: string | null;
                                 gachaRippingPackAnimationVideoUrl: string | null;
+                                tiers: {
+                                    tier: number;
+                                    name: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
+                                    chance: number | "UNDER-1-PERCENT";
+                                }[];
                             };
                         };
                     };
@@ -619,9 +624,10 @@ export interface paths {
                             /**
                              * @description Possible codes:
                              *     - `CARD_PACKS_QUERY_FAILED`: Failed to query card packs
+                             *     - `FUNCTION_ERROR`: Function error
                              * @enum {string}
                              */
-                            code: "CARD_PACKS_QUERY_FAILED";
+                            code: "CARD_PACKS_QUERY_FAILED" | "FUNCTION_ERROR";
                             message: string;
                             /** @description Debug info for local development only, never leak internals in production */
                             error?: string;

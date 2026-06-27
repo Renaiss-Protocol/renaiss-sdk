@@ -45,6 +45,7 @@ export const GACHA_VRF_PACKS_BY_SLUG_GET_CODES = [
   'INVALID_SCHEMA',
   'CARD_PACK_NOT_FOUND',
   'CARD_PACKS_QUERY_FAILED',
+  'FUNCTION_ERROR',
 ] as const;
 
 /** Error codes for `GET /v0/gacha/vrf/packs`. */

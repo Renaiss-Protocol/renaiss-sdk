@@ -122,6 +122,21 @@ function pack(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function packTiers() {
+  return [
+    {
+      tier: 4,
+      name: 'legendary',
+      chance: 62,
+    },
+    {
+      tier: 0,
+      name: 'common',
+      chance: 19,
+    },
+  ];
+}
+
 function preparedPullResponse() {
   return {
     chainId: 56,
@@ -298,7 +313,7 @@ describe('gacha actions', () => {
         calls.push(call);
 
         return jsonResponse({
-          cardPack: pack(),
+          cardPack: pack({ tiers: packTiers() }),
         });
       }),
     );
@@ -308,7 +323,9 @@ describe('gacha actions', () => {
       slug: 'gacha-pack',
     });
 
-    expect(expectSuccessResult(result).slug).toBe('gacha-pack');
+    const machine = expectSuccessResult(result);
+    expect(machine.slug).toBe('gacha-pack');
+    expect(machine.tiers).toEqual(packTiers());
     expect(calls[0]?.pathname).toBe('/v0/gacha/vrf/packs/gacha-pack');
   });
 
