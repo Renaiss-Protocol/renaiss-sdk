@@ -1,6 +1,6 @@
 {
   "name": "@renaiss-protocol/client",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0",
   "description": "The Renaiss TypeScript client",
   "repository": {
     "type": "git",
