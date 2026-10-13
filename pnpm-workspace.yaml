@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+  - 'examples/*'
+
+overrides:
+  # next pins postcss 8.4.31 exactly (GHSA postcss <8.5.23); remove once next ships a patched postcss
+  'next>postcss': ^8.5.23

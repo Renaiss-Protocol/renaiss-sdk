@@ -1,0 +1,40 @@
+# dependencies
+node_modules
+.pnpm-store
+.pnp
+.pnp.js
+.pnpm-store
+
+# build output
+**/dist
+
+# next.js
+.next/
+.next-dev/
+next-env.d.ts
+
+# misc
+.DS_Store
+*.pem
+
+# turbo
+.turbo
+
+# lockfiles
+package-lock.json
+yarn.lock
+
+# debug
+.pnpm-debug.log*
+
+# local env files
+.env
+.env.local
+.env.*.local
+
+# typescript
+*.tsbuildinfo
+
+# test results
+coverage/
+reports/

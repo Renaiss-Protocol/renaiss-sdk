@@ -1,0 +1,13 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "web": "0.0.0",
+    "@renaiss-protocol/bindings": "0.1.0-beta.0",
+    "@renaiss-protocol/client": "0.1.0-beta.4",
+    "@renaiss-protocol/error-codes": "0.1.0-beta.0",
+    "@renaiss-protocol/fp": "0.1.0-beta.0",
+    "@renaiss-protocol/schema-validation": "0.1.0-beta.0"
+  },
+  "changesets": []
+}

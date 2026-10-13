@@ -1,0 +1,38 @@
+name: Pull Request
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changeset:
+    name: Changeset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch Base Branch
+        run: git fetch origin ${{ github.base_ref }}:${{ github.base_ref }}
+
+      - name: Set Up Repository
+        uses: ./.github/actions/setup
+
+      - name: Ensure Changeset Added
+        run: pnpm changeset status --since=${{ github.base_ref }}
+
+  verify:
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+
+  test:
+    name: Tests
+    uses: ./.github/workflows/tests.yml
