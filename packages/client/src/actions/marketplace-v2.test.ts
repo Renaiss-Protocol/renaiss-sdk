@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BNB_MAINNET,
   BNB_TESTNET,
+  CollectibleType,
   createMarketplaceClient,
   isCreateAskError,
   isListMarketplaceCardsError,
@@ -251,19 +252,10 @@ describe('v2 marketplace boundaries', () => {
           {
             tokenId,
             name: 'Card',
-            setName: 'Set',
-            cardNumber: '1',
-            pokemonName: 'Pikachu',
             ownerAddress: account.address,
             askPriceInUSDT: amount,
-            fmvPriceInUSD: '9007199254740993123',
+            fmvInUsd: '9007199254740993123',
             frontImageUrl: 'https://example.com/slab.png',
-            attributes: [],
-            owner: null,
-            vaultLocation: 'platform',
-            gradingCompany: 'PSA',
-            grade: '10',
-            year: 2025,
           },
         ],
         pagination: {
@@ -285,11 +277,64 @@ describe('v2 marketplace boundaries', () => {
     });
     const first = value(await pages.firstPage());
     expect(first.items[0]?.askPriceInUsdt).toBe(amount);
+    expect(first.items[0]?.fmvInUsd).toBe('9007199254740993123');
     expect(first.items[0]?.frontImageUrl).toContain('slab');
     expect(first.nextCursor).toBeDefined();
     const all = [];
     for await (const page of pages) all.push(value(page));
     expect(all).toHaveLength(2);
+  });
+  it('sorts by fmvInUsd', async () => {
+    const fetch = vi.fn(async (url: string) => {
+      expect(new URL(url).searchParams.get('sortBy')).toBe('fmvInUsd');
+      return Response.json({
+        collection: [],
+        pagination: { total: 0, limit: 25, offset: 0, hasMore: false },
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+    value(
+      await client()
+        .listMarketplaceCards({ sortBy: MarketplaceV2Sort.FmvPrice })
+        .firstPage(),
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('reads a collectible with its type and attributes, and no FMV as null', async () => {
+    const attributes = [
+      { key: 'Grader', value: 'PSA' },
+      { key: 'Grade', value: '10 Gem Mint' },
+      { key: 'Cert Number', value: '12345678' },
+    ];
+    const fetch = vi.fn(async (url: string) => {
+      expect(new URL(url).pathname).toBe(
+        `/v2/marketplace/collectibles/${tokenId}`,
+      );
+      return Response.json({
+        collectible: {
+          tokenId,
+          type: 'POKEMON',
+          name: 'Card',
+          ownerAddress: account.address,
+          askPriceInUSDT: 'NO-ASK-PRICE',
+          askExpiresAt: null,
+          fmvInUsd: 'NO-FMV-PRICE',
+          fmvUpdatedAt: null,
+          frontImageUrl: 'https://example.com/slab.png',
+          backImageUrl: 'https://example.com/back.png',
+          attributes,
+          owner: null,
+        },
+        pricing: { top_offer: null, last_sale: null, price_history: [] },
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const card = value(await client().fetchCard({ tokenId }));
+    expect(card.type).toBe(CollectibleType.Pokemon);
+    expect(card.attributes).toEqual(attributes);
+    expect(card.fmvInUsd).toBeNull();
+    expect(card.askPriceInUsdt).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('signs an ask directly with the EOA, directly, and submits once', async () => {
     const prepared = ask();

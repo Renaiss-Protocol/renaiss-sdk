@@ -1,6 +1,10 @@
 import { type Result, run } from '@renaiss-protocol/fp';
 import type {
+  EoaActivity,
   EoaBuybackOffer,
+  EoaCollectionCard,
+  EoaCollectionSummary,
+  EoaDrawStatus,
   EoaMachine,
   EoaMachineContent,
   EoaMachineDetail,
@@ -18,20 +22,27 @@ import {
   type EoaCreateBuybackRequest,
   type EoaDrawStatusRequest,
   type EoaListMachinesRequest,
+  type EoaMachineContentsRequest,
   type EoaMachinePageRequest,
   type EoaMachineRequest,
   type EoaPreparePullRequest,
   type EoaSignPullRequest,
   type EoaSubmitBuybackRequest,
   type EoaSubmitPullRequest,
+  type EoaWalletActivitiesRequest,
+  type EoaWalletAddressRequest,
+  type EoaWalletCollectionRequest,
   type EoaWalletPageRequest,
   type EoaWalletRequest,
   fetchEoaDrawStatus,
   fetchEoaMachine,
   fetchEoaOffers,
+  fetchEoaWalletCollectionSummary,
   listEoaContents,
   listEoaMachines,
   listEoaPublicHistory,
+  listEoaWalletActivities,
+  listEoaWalletCollection,
   listEoaWalletPulls,
   prepareEoaPull,
   signEoaPull,
@@ -44,6 +55,7 @@ export type {
   EoaCreateBuybackRequest,
   EoaDrawStatusRequest,
   EoaListMachinesRequest,
+  EoaMachineContentsRequest,
   EoaMachinePageRequest,
   EoaMachineRequest,
   EoaPreparePullRequest,
@@ -51,6 +63,9 @@ export type {
   EoaSignPullRequest,
   EoaSubmitBuybackRequest,
   EoaSubmitPullRequest,
+  EoaWalletActivitiesRequest,
+  EoaWalletAddressRequest,
+  EoaWalletCollectionRequest,
   EoaWalletPageRequest,
   EoaWalletRequest,
 } from '../actions/gacha-v2';
@@ -81,14 +96,17 @@ export type EoaGachaActions = {
     request: EoaMachineRequest,
   ): Promise<Result<EoaMachineDetail>>;
   /**
-   * Page through the cards a machine can draw, with names, tiers, images and
-   * buyback base values. `slug` selects the machine; `pageSize` is 1 to 100
-   * (default 20). Requires no builder key or signer. Paginated; Result
+   * Page through the collectibles a machine can draw: name, tier, image,
+   * buyback base value, `type`, current market value (`fmvInUsd`, USD cents)
+   * and `attributes`. `slug` selects the machine; `tiers` keeps only those
+   * tiers (names from the machine's `tiers`; every tier when omitted), and is
+   * applied before paging. `pageSize` is 1 to 100 (default 20). Requires no
+   * builder key or signer. Paginated; Result
    * failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with isListGachaMachineContentsError.
    * @throws Never; errors are Result values.
    */
   listGachaMachineContents(
-    request: EoaMachinePageRequest,
+    request: EoaMachineContentsRequest,
   ): Paginated<EoaMachineContent[]>;
   /**
    * Page through the cards recently pulled from a machine, newest first. A pull
@@ -110,14 +128,59 @@ export type EoaGachaActions = {
    */
   listWalletPulls(request: EoaWalletPageRequest): Paginated<EoaPull[]>;
   /**
+   * Page through the cards `walletAddress` has: the cards it owns on chain,
+   * however it got them, and the cards it pulled with your builder key that
+   * Renaiss still holds for it (in the buyback window, then awaiting delivery).
+   * A card it pulled with another builder appears once it is delivered on
+   * chain, so two builders can get different lists for one address. `pull` is
+   * the wallet's pull of the card with your builder key, null otherwise.
+   * `sortBy` and `sortOrder` apply to the whole list; `pageSize` is 1 to 100
+   * (default 20). Exactly the address given is read: an owner wallet and its
+   * Renaiss Safe are two wallets. Requires the builder key. Paginated; Result
+   * failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with isListWalletCollectionError.
+   * @throws Never; errors are Result values.
+   */
+  listWalletCollection(
+    request: EoaWalletCollectionRequest,
+  ): Paginated<EoaCollectionCard[]>;
+  /**
+   * Read the collectible count and the total market value (USD cents) of exactly the
+   * collectibles `listWalletCollection` lists for `walletAddress`. Requires the
+   * builder key. Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with
+   * isFetchWalletCollectionSummaryError.
+   * @throws Never; errors are Result values.
+   */
+  fetchWalletCollectionSummary(
+    request: EoaWalletAddressRequest,
+  ): Promise<Result<EoaCollectionSummary>>;
+  /**
+   * Page through what `walletAddress` did on chain with cards, newest first,
+   * whichever builder it used: gacha pulls, buybacks and deliveries,
+   * marketplace buys and sells, transfers, mints and redemptions; `filter`
+   * keeps one `EoaActivityFilter`. A pull names its pack's on-chain id and a
+   * buyback its settlement ids; neither names a card. Pages follow the API's
+   * cursor with up to `pageSize` events (1 to 50, default 20). A transaction's
+   * entries can span pages. Requires the builder key. Paginated; Result failures:
+   * WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with isListWalletActivitiesError.
+   * @throws Never; errors are Result values.
+   */
+  listWalletActivities(
+    request: EoaWalletActivitiesRequest,
+  ): Paginated<EoaActivity[]>;
+  /**
    * Read the outcome of a pull by `buyerWalletAddress` and its funding
    * transaction hash (`permitFundTxHash`). Use it to recover after an
    * interrupted `submitGachaPull`. It reads only; it never submits or pays
-   * again. Needs the builder key, set as `builderApiKey` or added by your proxy. Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with
+   * again. A resolved draw carries its frozen values (`tier`,
+   * `buybackBaseValueInUSD`) and `collectible`
+   * (`type`, name, image, `fmvInUsd`, `attributes`); they are null when they
+   * could not be loaded. Needs the builder key, set as `builderApiKey` or added by your proxy. Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with
    * isFetchGachaDrawStatusError.
    * @throws Never; errors are Result values.
    */
-  fetchGachaDrawStatus(request: EoaDrawStatusRequest): Promise<Result<EoaPull>>;
+  fetchGachaDrawStatus(
+    request: EoaDrawStatusRequest,
+  ): Promise<Result<EoaDrawStatus>>;
   /**
    * Fetch the buyback offers currently open for `buyerWalletAddress` under this
    * builder as one array. The SDK reads the API's pages of 100 one after
@@ -137,7 +200,7 @@ export type EoaGachaActions = {
     request: EoaWalletRequest,
   ): Promise<Result<EoaBuybackOffer[]>>;
   /**
-   * Ask the API to prepare a pull of `quantity` cards (default 1) from the
+   * Ask the API to prepare a pull of `quantity` cards (1 to 10, default 1) from the
    * machine `machineSlug` for `buyerWalletAddress`. `expectedPriceInUsdt` is the
    * per-card price the user saw, in token base units. Before anything is
    * approved, the SDK compares the preparation with that price, the selected
@@ -177,9 +240,13 @@ export type EoaGachaActions = {
   ): Promise<Result<EoaResolvedPull>>;
   /**
    * Sign a buyback of 1 to 10 offers from `fetchGachaBuybackOffers`. The offers
-   * must be unique, unexpired, positive and from one pack and contract, and
-   * `chainId`, `token` and the signer must match the selected network. The
-   * signed amount is the exact sum of the offers. No NFT approval is needed.
+   * must be unique and from one pack and contract, and each must pay a positive
+   * price in its current tier. `chainId`, `token` and the signer must match the
+   * selected network. The signed amount is the exact sum of each offer's
+   * current-tier price, and must equal the required `expectedAmountInUsdt`
+   * (the total the user confirmed, in 18-decimal USDT units). A changed quote
+   * fails with WRONG_REQUEST_PARAMS before requesting a signature; read the
+   * offers again and confirm the updated amount. No NFT approval is needed.
    * Requires a signer. Result failures: WRONG_REQUEST_PARAMS,
    * GACHA_SIGNING_FAILED. Narrow with isCreateGachaBuybackError.
    * @throws Never; errors are Result values.
@@ -188,9 +255,10 @@ export type EoaGachaActions = {
     request: EoaCreateBuybackRequest,
   ): Promise<Result<EoaSignedBuyback>>;
   /**
-   * Submit a signed buyback once. If it fails because an offer expired or the
-   * delivery is in doubt, read the offers again with `fetchGachaBuybackOffers`
-   * before signing a new buyback. Needs the builder key, set as `builderApiKey` or added by your proxy. Result failures:
+   * Submit a signed buyback once. If it fails because a buyback tier ended
+   * (`GACHA_V3_BUYBACK_PRICE_CHANGED`), an offer expired, or the delivery is in
+   * doubt, read the offers again with `fetchGachaBuybackOffers` before you sign
+   * a new buyback. Needs the builder key, set as `builderApiKey` or added by your proxy. Result failures:
    * WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with isSubmitGachaBuybackError.
    * @throws Never; errors are Result values.
    */
@@ -205,12 +273,18 @@ export function decorateEoaGacha(context: EoaContext): EoaGachaActions {
       listEoaMachines(context, request),
     fetchGachaMachine: (request: EoaMachineRequest) =>
       run(fetchEoaMachine(context, request)),
-    listGachaMachineContents: (request: EoaMachinePageRequest) =>
+    listGachaMachineContents: (request: EoaMachineContentsRequest) =>
       listEoaContents(context, request),
     listGachaPullHistory: (request: EoaMachinePageRequest) =>
       listEoaPublicHistory(context, request),
     listWalletPulls: (request: EoaWalletPageRequest) =>
       listEoaWalletPulls(context, request),
+    listWalletCollection: (request: EoaWalletCollectionRequest) =>
+      listEoaWalletCollection(context, request),
+    fetchWalletCollectionSummary: (request: EoaWalletAddressRequest) =>
+      run(fetchEoaWalletCollectionSummary(context, request)),
+    listWalletActivities: (request: EoaWalletActivitiesRequest) =>
+      listEoaWalletActivities(context, request),
     fetchGachaDrawStatus: (request: EoaDrawStatusRequest) =>
       run(fetchEoaDrawStatus(context, request)),
     fetchGachaBuybackOffers: (request: EoaWalletRequest) =>

@@ -59,7 +59,7 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
                 </span>
                 <div className={styles.rowLine}>
                   <FmvBadge
-                    cents={card.fmvPriceInUsd}
+                    cents={card.fmvInUsd}
                     updatedAt={card.fmvUpdatedAt}
                   />
                   <button

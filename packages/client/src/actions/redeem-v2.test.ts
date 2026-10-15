@@ -54,14 +54,14 @@ const orderCard = {
   tokenId: '1',
   name: 'Test Card',
   frontImageUrl: 'https://img.example/1.png',
-  fmvPriceInUsd: '1000',
+  fmvInUsd: '1000',
 };
 const listedOrder = {
   requestId,
   status: 'Shipped',
   trackingNumber: 'TRK1',
   shipmentStatus: 'in transit',
-  cards: [orderCard],
+  collectibles: [orderCard],
 };
 const orderDetail = {
   ...listedOrder,
@@ -81,7 +81,7 @@ const orderDetail = {
   trackingLastSyncedAt: null,
   createdAt: '2026-10-01T00:00:00.000Z',
   updatedAt: null,
-  cards: [
+  collectibles: [
     {
       ...orderCard,
       fmvUpdatedAt: null,
@@ -235,8 +235,8 @@ beforeEach(() => {
           scopes: ['redeem:read', 'redeem:write'],
         });
       if (path === '/v2/auth/wallet/revoke') return json({ revoked: true });
-      if (path === '/v2/redeem/cards')
-        return json({ cards: [], total: 0, page: 1, hasMore: false });
+      if (path === '/v2/redeem/collectibles')
+        return json({ collectibles: [], total: 0, page: 1, hasMore: false });
       if (path === '/v2/redeem/regions') return json({ counts: { US: 2 } });
       if (path === '/v2/redeem/orders')
         return json({
@@ -659,7 +659,7 @@ describe('wallet sessions', () => {
     expect(isSuccess(await sdk.listRedeemableCards().firstPage())).toBe(true);
     expect(requests.some((r) => r.path.endsWith('/config'))).toBe(false);
     const headers = new Headers(
-      requests.find((r) => r.path.endsWith('/cards'))?.init.headers,
+      requests.find((r) => r.path.endsWith('/collectibles'))?.init.headers,
     );
     expect(headers.get('authorization')).toBe('Bearer rnws_at_fixture');
     expect(headers.get('x-builder-api-key')).toBe('rnbldr_live_fixture');

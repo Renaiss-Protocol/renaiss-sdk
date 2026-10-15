@@ -11,7 +11,7 @@ const privateReads = new Set([
   'v2/gacha/buyback/offers',
 ]);
 const redemptionReads =
-  /^v2\/redeem\/(?:cards|regions|orders(?:\/0x[\da-fA-F]{64})?|checkout\/[\da-fA-F-]{36})$/;
+  /^v2\/redeem\/(?:collectibles|regions|orders(?:\/0x[\da-fA-F]{64})?|checkout\/[\da-fA-F-]{36})$/;
 const redemptionTracking = /^v2\/redeem\/orders\/0x[\da-fA-F]{64}\/tracking$/;
 const writes = new Set([
   'v2/auth/wallet/nonce',
@@ -48,7 +48,7 @@ async function forward(request: Request, context: Context): Promise<Response> {
   const isPublic =
     request.method === 'GET' &&
     (publicReads.test(path) ||
-      /^v2\/marketplace(?:\/cards\/\d+(?:\/orders)?)?$/.test(path));
+      /^v2\/marketplace(?:\/collectibles\/\d+(?:\/orders)?)?$/.test(path));
   if (
     !(
       isPublic ||

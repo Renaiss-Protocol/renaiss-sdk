@@ -1,5 +1,37 @@
 # @renaiss-protocol/client
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- Follow the v2 API's collectible names and shape and its buyback tiers. This release needs a `/v2` API that serves them; check the deployment's `/v2/docs`. Against an older API the renamed routes get an HTTP 404 (`UNKNOWN_ERROR` with status 404) and the changed reads fail with `INVALID_SCHEMA`.
+
+  Breaking changes:
+
+  - Redemption orders return `collectibles` instead of `cards` on `listRedemptionOrders`, `fetchRedemptionOrder` and `syncRedemptionTracking`.
+  - `createGachaBuyback` requires `expectedAmountInUsdt`, the total the user confirmed in 18-decimal USDT units. If the current-tier sum differs, it returns `WRONG_REQUEST_PARAMS` before requesting a signature. Read the offers again and confirm the updated amount before retrying.
+  - Every FMV price is `fmvInUsd` (before: `fmvPriceInUsd`) on `MarketplaceCard`, `CardDetail`, `RedeemableCard` and the redemption order cards. `MarketplaceV2Sort.FmvPrice` now sends `fmvInUsd`.
+  - `CardDetail` (`fetchCard`) has `type` and an `attributes` list instead of `setName`, `cardNumber`, `pokemonName`, `gradingCompany`, `grade` and `year`. `attributes` is `{ key, value }[]` in the order Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language, with empty values left out; the old `Serial` trait is now the `Cert Number` key. `frontWithoutStandImageUrl` is removed.
+  - In the `submitGachaPull` result, `tier` and `buybackBaseValueInUSD` move from `draws[].collectible` onto `draws[]`, and `snapshotBuybackValueInUsdt` is removed: read the payout from `fetchGachaBuybackOffers`. `collectible` adds `type`, `fmvInUsd`, `fmvUpdatedAt` and `attributes`, and no longer has `imageUrl`.
+  - `EoaMachine` and `EoaMachineDetail` no longer have `featuredCardFmvInUsd`.
+  - `EoaMachineDetail` no longer has `buybackPercentage` or `buybackWindowSeconds`. Read the new `buybackConfig` instead: every tier as `{ buybackPercentage, buybackExpiredInSeconds }`, soonest end first, without a tier that ends at the same time as an earlier one. The smallest `buybackExpiredInSeconds` is the tier in effect when a draw resolves; the largest is the longest window, after which a pull is released and appears in `listGachaPullHistory`.
+  - `EoaBuybackOffer` (`fetchGachaBuybackOffers`) no longer has `amountInUsdt` or `expiresAt`. Read `buybackTiers` instead: every tier as `{ buybackPercentage, amountInUsdt, expiresAt }`, soonest end first. The price now is the first tier whose `expiresAt` has not passed. `createGachaBuyback` signs that price for each offer and refuses an offer that pays nothing now.
+  - A buyback whose price changed before it reached Renaiss fails with `GACHA_V3_BUYBACK_PRICE_CHANGED` (HTTP 409) in `ApiError.error`; before, it failed with `GACHA_V3_BUYBACK_VERIFY_FAILED` (HTTP 400). Read the offers again and sign again.
+
+  Additions:
+
+  - `listWalletCollection` entries (`EoaCollectionCard`) carry `type`, `fmvInUsd`, `fmvUpdatedAt` and `attributes`, and `fetchWalletCollectionSummary` returns `collectibleCount`, `totalFmvInUsd` and `collectiblesWithoutFmv`.
+  - `EoaMachineContent` (`listGachaMachineContents`) adds `type`, `fmvInUsd`, `fmvUpdatedAt` and `attributes`.
+  - `fetchGachaDrawStatus` returns `EoaDrawStatus`: each draw also carries `tier`, `buybackBaseValueInUSD` and a `collectible` (`EoaDrawnCollectible`), the same as the reveal. They are `null` when they could not be loaded.
+  - `listGachaMachineContents` takes `tiers` (`GachaMachineTierName[]`) to keep only those tiers; the filter applies before paging, so `totalCount` counts only matching entries.
+  - `CollectibleType`, `GachaMachineTierName`, `EoaDrawStatus`, `EoaDrawnCollectible` and `EoaMachineContentsRequest` are exported.
+  - `getEoaBuybackTierAt`, `getEoaBuybackOfferEndsAt` and `EoaBuybackTier` are exported.
+  - A collectible that the gacha inventory contract holds (pack stock, or a drawn collectible awaiting release) can now be read with `fetchCard`; its `ownerAddress` is that contract.
+
+  The bindings are regenerated from the `/v2` API that serves these changes.
+
+- `prepareGachaPull` and `signGachaPull` take any whole quantity from 1 to 10 (`MAX_GACHA_PULL_QUANTITY`), not only 1, 5 and 10. The `GachaQuantity` enum is removed: pass the number. Three builder-key reads are added to the gacha client. They read `/v2/users/{walletAddress}` and take `{ walletAddress }`: `listWalletCollection` (the cards the address owns on chain, plus the cards it pulled with your builder key that Renaiss still holds; sort by pull time, market value or buyback expiry), `fetchWalletCollectionSummary` (card count and total market value) and `listWalletActivities` (the wallet's chain events with any builder: gacha pulls, buybacks and deliveries, trades, transfers, mints and redemptions, optionally one `EoaActivityFilter`, paged by the API's cursor), with their `is*Error` guards. `listGachaPullHistory` entries carry `imageUrl`, the card alone without slab, frame or background. The bindings are regenerated for these routes. This release needs a `/v2` API that serves these routes and fields; check the deployment's `/v2/docs`. Against an older API the three new reads get an HTTP 404 (`UNKNOWN_ERROR` with status 404), a quantity other than 1, 5 or 10 is refused by the API (`GACHA_V2_REQUEST_FAILED`, status 400), and `listGachaPullHistory` fails with `INVALID_SCHEMA` because its entries have no `imageUrl`.
+
 ## 0.1.0-beta.4
 
 ### Patch Changes

@@ -42,11 +42,18 @@ export enum PriceToken {
 }
 
 export const CardAttributeSchema = z.object({
-  trait: z.string(),
+  key: z.string(),
   value: z.string(),
 });
 
 export type CardAttribute = z.infer<typeof CardAttributeSchema>;
+
+/** A collectible's category. */
+export enum CollectibleType {
+  Pokemon = 'POKEMON',
+  OnePiece = 'ONE_PIECE',
+  Sports = 'SPORTS',
+}
 
 const CardOwnerSchema = z.object({
   username: z.string(),

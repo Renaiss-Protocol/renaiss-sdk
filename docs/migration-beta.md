@@ -44,7 +44,7 @@ npm install --save-exact @renaiss-protocol/client@0.1.0-alpha.2
 
 Your dependency should read `"@renaiss-protocol/client": "0.1.0-alpha.2"`, with
 no caret or tilde, and you should retain your lockfile. A range such as
-`^0.1.0-alpha.2` also matches `0.1.0-beta.4`; a fresh resolution or update can
+`^0.1.0-alpha.2` also matches `0.1.0-beta.5`; a fresh resolution or update can
 therefore select the breaking beta. Pin the alpha version you actually use.
 
 | Previous concern | EOA beta integration |
@@ -63,6 +63,9 @@ does not move assets held by an existing Safe.
 
 Other removed or changed root exports:
 
+- `GachaQuantity` is removed. A pull takes any whole number of cards from 1 to
+  `MAX_GACHA_PULL_QUANTITY` (10), so `quantity` is a plain `number`: replace
+  `GachaQuantity.Five` with `5`.
 - Standalone v1 actions and their response schemas are no longer exported.
   Use methods on the EOA clients; they validate API responses internally.
 - `exhaustive`, `isRenaissError` and the broad `ErrorCode` type are removed.
@@ -91,6 +94,6 @@ Beta versions are published under the `beta` npm tag:
 npm install @renaiss-protocol/client@beta
 ```
 
-The package is at `0.1.0-beta.4`; the publishing workflow derives the `beta` tag
+The package is at `0.1.0-beta.5`; the publishing workflow derives the `beta` tag
 from the `-beta.n` version suffix. No npm major-version-2 bump is part of this
 migration.

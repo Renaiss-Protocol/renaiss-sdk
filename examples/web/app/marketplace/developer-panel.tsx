@@ -39,8 +39,8 @@ function wirePaths(tokenId: string | null): { id: EndpointId; path: string }[] {
   ];
   if (tokenId)
     paths.push(
-      { id: 'detail', path: `v2/marketplace/cards/${tokenId}` },
-      { id: 'orders', path: `v2/marketplace/cards/${tokenId}/orders` },
+      { id: 'detail', path: `v2/marketplace/collectibles/${tokenId}` },
+      { id: 'orders', path: `v2/marketplace/collectibles/${tokenId}/orders` },
     );
   return paths;
 }

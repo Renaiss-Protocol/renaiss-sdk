@@ -42,11 +42,6 @@ const machineFields: FieldUse[] = [
     use: "Not displayed; list cards show the detail's activeSetExpectedValueInUsd",
   },
   {
-    field: 'featuredCardFmvInUsd',
-    status: 'shown',
-    use: 'List card "Featured card value". null for v3 machines; the demo then shows the highest tier maximum, labelled "Catalog max"',
-  },
-  {
     field: 'onChainPackId',
     status: 'sdk',
     use: 'Permit witness consistency check',
@@ -123,14 +118,9 @@ export const coverage: EndpointCoverage[] = [
         use: 'Detail and list "Set EV" chip (mean value of the whole set, drawn cards included)',
       },
       {
-        field: 'cardPack.buybackPercentage',
-        status: 'shown',
-        use: '"Instant buyback" percentage cell',
-      },
-      {
-        field: 'cardPack.buybackWindowSeconds',
-        status: 'shown',
-        use: 'Pull-history hint ("after their buyback offer period"); offer expiry window',
+        field: 'cardPack.buybackConfig[]',
+        status: 'derived',
+        use: 'The smallest window is the current tier: "Instant buyback" percentage cell. The largest is the longest: pull-history hint ("after their buyback offer period"); offer expiry window',
       },
     ],
   },
@@ -140,24 +130,29 @@ export const coverage: EndpointCoverage[] = [
     sdk: 'listGachaMachineContents()',
     fields: [
       {
-        field: 'cards[].name',
+        field: 'collectibles[].name',
         status: 'shown',
         use: 'Showcase caption; tile title',
       },
       {
-        field: 'cards[].tier',
+        field: 'collectibles[].tier',
         status: 'derived',
         use: 'Tier filter, applied in the browser over every loaded page',
       },
       {
-        field: 'cards[].buybackBaseValueInUsd',
+        field: 'collectibles[].buybackBaseValueInUsd',
         status: 'shown',
         use: '"Buyback base value $X" pill; sort key',
       },
       {
-        field: 'cards[].frontImageUrl',
+        field: 'collectibles[].frontImageUrl',
         status: 'shown',
         use: 'Slab render in the grid',
+      },
+      {
+        field: 'collectibles[].{type,fmvInUsd,fmvUpdatedAt,attributes}',
+        status: 'unused',
+        use: 'Not displayed: category, market value and attributes for a collectible popup',
       },
       {
         field: 'pagination.total',
@@ -190,6 +185,11 @@ export const coverage: EndpointCoverage[] = [
         field: 'pulls[].frontImageUrl',
         status: 'shown',
         use: 'Slab thumbnail',
+      },
+      {
+        field: 'pulls[].imageUrl',
+        status: 'unused',
+        use: 'The card alone (no slab, frame or background). The demo keeps the slab thumbnail',
       },
       { field: 'pagination.limit', status: 'sdk', use: 'Cursor' },
       { field: 'pagination.offset', status: 'sdk', use: 'Cursor' },
@@ -329,25 +329,20 @@ export const coverage: EndpointCoverage[] = [
         use: 'Reveal card name',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.tier',
+        field: 'draws_resolved.data.draws[].tier',
         status: 'shown',
         use: '"You got a C-tier card!"',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.imageUrl',
-        status: 'unused',
-        use: 'Not displayed; the reveal uses frontImageUrl',
-      },
-      {
-        field: 'draws_resolved.data.draws[].collectible.buybackBaseValueInUSD',
+        field: 'draws_resolved.data.draws[].buybackBaseValueInUSD',
         status: 'shown',
         use: '"Buyback base value $X"; instant buyback %',
       },
       {
         field:
-          'draws_resolved.data.draws[].collectible.snapshotBuybackValueInUsdt',
-        status: 'shown',
-        use: '"Instant price $X" before the offer is available',
+          'draws_resolved.data.draws[].collectible.{type,fmvInUsd,fmvUpdatedAt,attributes}',
+        status: 'unused',
+        use: 'Not displayed',
       },
       {
         field: 'draws_resolved.data.draws[].collectible.frontImageUrl',
@@ -450,14 +445,19 @@ export const coverage: EndpointCoverage[] = [
         use: 'Matches a reveal / history row',
       },
       {
-        field: 'offers[].amountInUsdt',
+        field: 'offers[].buybackTiers[].buybackPercentage',
         status: 'shown',
-        use: '"Accept for $X"; signed amount',
+        use: '"90% Instant buyback" (current tier)',
       },
       {
-        field: 'offers[].expiresAt',
+        field: 'offers[].buybackTiers[].amountInUsdt',
         status: 'shown',
-        use: '"Offer expires in MM:SS"',
+        use: '"Accept for $X" (current tier); signed amount',
+      },
+      {
+        field: 'offers[].buybackTiers[].expiresAt',
+        status: 'shown',
+        use: '"Price changes in" / "Offer expires in MM:SS"',
       },
       {
         field: 'offers[].vendingMachineAddress',

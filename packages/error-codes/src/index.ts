@@ -72,6 +72,9 @@ export const V2_FETCH_GACHA_MACHINE_ERROR_CODES = v2ReadCodes;
 export const V2_LIST_GACHA_MACHINE_CONTENTS_ERROR_CODES = v2ReadCodes;
 export const V2_LIST_GACHA_PULL_HISTORY_ERROR_CODES = v2ReadCodes;
 export const V2_LIST_WALLET_PULLS_ERROR_CODES = v2ReadCodes;
+export const V2_LIST_WALLET_COLLECTION_ERROR_CODES = v2ReadCodes;
+export const V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES = v2ReadCodes;
+export const V2_LIST_WALLET_ACTIVITIES_ERROR_CODES = v2ReadCodes;
 export const V2_FETCH_GACHA_DRAW_STATUS_ERROR_CODES = v2ReadCodes;
 export const V2_FETCH_GACHA_BUYBACK_OFFERS_ERROR_CODES = v2ReadCodes;
 export const V2_PREPARE_GACHA_PULL_ERROR_CODES = [
@@ -101,6 +104,12 @@ export type V2ListGachaPullHistoryErrorCode =
   (typeof V2_LIST_GACHA_PULL_HISTORY_ERROR_CODES)[number];
 export type V2ListWalletPullsErrorCode =
   (typeof V2_LIST_WALLET_PULLS_ERROR_CODES)[number];
+export type V2ListWalletCollectionErrorCode =
+  (typeof V2_LIST_WALLET_COLLECTION_ERROR_CODES)[number];
+export type V2FetchWalletCollectionSummaryErrorCode =
+  (typeof V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES)[number];
+export type V2ListWalletActivitiesErrorCode =
+  (typeof V2_LIST_WALLET_ACTIVITIES_ERROR_CODES)[number];
 export type V2FetchGachaDrawStatusErrorCode =
   (typeof V2_FETCH_GACHA_DRAW_STATUS_ERROR_CODES)[number];
 export type V2FetchGachaBuybackOffersErrorCode =

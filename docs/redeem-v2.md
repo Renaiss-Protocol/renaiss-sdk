@@ -44,7 +44,7 @@ parameters are optional: `search` (text up to 200 characters), `countryCode`
 (two uppercase letters), `sortBy` (`RedemptionCardSort.Fmv` or `.CreatedAt`),
 `sortOrder` (`RedemptionSortOrder.Ascending` or `.Descending`) and `pageSize`
 (1 to 50, default 50). Each card has `tokenId`, `name`, `frontImageUrl`,
-`fmvPriceInUsd`, `fmvUpdatedAt` and `ownerAcquiredAt` (each can be `null`),
+`fmvInUsd`, `fmvUpdatedAt` and `ownerAcquiredAt` (each can be `null`),
 `regionCountryCode` and `vaultDisplayName`. Pages carry `totalCount` and
 `hasMore`.
 
@@ -116,7 +116,7 @@ from an interrupted or uncertain submission.
 `listRedemptionOrders({ pageSize? })` pages through this builder's orders for the
 wallet. `pageSize` is 1 to 20 and defaults to 10. Pages report `hasMore` but no
 total. Each entry has `requestId`, `status`, `trackingNumber`, `shipmentStatus`
-and a short card list (`tokenId`, `name`, `frontImageUrl`, `fmvPriceInUsd`). A
+and a short `collectibles` list (`tokenId`, `name`, `frontImageUrl`, `fmvInUsd`). A
 newly submitted order may not appear until it is indexed; keep using
 `fetchRedemptionCheckout` until it does.
 
@@ -124,8 +124,8 @@ newly submitted order may not appear until it is indexed; keep using
 `tokenStatuses`, `address`, `recipient`, `courierName`, the estimated delivery
 range in days (`estimatedDeliveryDaysMin` and `Max`, either can be `null`), a
 `fees` breakdown without a total, tracking (`trackingNumber`, `trackingUrl`,
-`shipmentStatus`, `trackingLastSyncedAt`), `createdAt`, `updatedAt` and `cards`.
-The cards have the same fields as eligible cards, without `ownerAcquiredAt`.
+`shipmentStatus`, `trackingLastSyncedAt`), `createdAt`, `updatedAt` and `collectibles`.
+The collectibles have the same fields as eligible cards, without `ownerAcquiredAt`.
 
 `syncRedemptionTracking({ requestId })` asks the API to refresh the order's
 tracking and returns the same order shape as `fetchRedemptionOrder`.

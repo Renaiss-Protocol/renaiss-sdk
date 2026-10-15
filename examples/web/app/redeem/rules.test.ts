@@ -33,7 +33,7 @@ function card(
     tokenId,
     name: `Card #${tokenId}`,
     frontImageUrl: 'https://img.example/card.png',
-    fmvPriceInUsd: fmv,
+    fmvInUsd: fmv,
     fmvUpdatedAt: null,
     ownerAcquiredAt: null,
     regionCountryCode: region,

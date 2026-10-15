@@ -48,7 +48,7 @@ export const coverage: EndpointCoverage[] = [
         use: '"Listed" pill, "$ 175.44" / "unlisted", hover button label (Buy now vs Make an offer)',
       },
       {
-        field: 'collection[].fmvPriceInUSD',
+        field: 'collection[].fmvInUsd',
         status: 'shown',
         use: 'Gold "FMV $ 172" badge (hidden when NO-FMV-PRICE)',
       },
@@ -78,7 +78,7 @@ export const coverage: EndpointCoverage[] = [
   },
   {
     id: 'detail',
-    endpoint: 'GET /v2/marketplace/cards/{tokenId}',
+    endpoint: 'GET /v2/marketplace/collectibles/{tokenId}',
     sdk: 'fetchCard()',
     fields: [
       {
@@ -87,39 +87,14 @@ export const coverage: EndpointCoverage[] = [
         use: '"Token ID 477043...0477" cell, share URL, explorer NFT link',
       },
       {
+        field: 'collectible.type',
+        status: 'unused',
+        use: 'Not displayed',
+      },
+      {
         field: 'collectible.name',
         status: 'shown',
-        use: 'Image alt, dialog card info; the header uses the parts below instead',
-      },
-      {
-        field: 'collectible.gradingCompany',
-        status: 'shown',
-        use: 'Header row 1 "PSA 8 NM-MT"; Card Details "Grader"',
-      },
-      {
-        field: 'collectible.grade',
-        status: 'shown',
-        use: 'Header row 1; Card Details "Grade"',
-      },
-      {
-        field: 'collectible.year',
-        status: 'shown',
-        use: 'Header row 1; Card Details "Year"',
-      },
-      {
-        field: 'collectible.setName',
-        status: 'shown',
-        use: 'Header row 1; Card Details "Set"',
-      },
-      {
-        field: 'collectible.cardNumber',
-        status: 'shown',
-        use: 'Header row 2 "#number …"; Card Details "Card Number"',
-      },
-      {
-        field: 'collectible.pokemonName',
-        status: 'shown',
-        use: 'Header row 2 "… name"',
+        use: 'Image alt, dialog card info; the header uses attributes[] instead',
       },
       {
         field: 'collectible.ownerAddress',
@@ -147,7 +122,7 @@ export const coverage: EndpointCoverage[] = [
         use: 'Listing expiry in the Edit listing form',
       },
       {
-        field: 'collectible.fmvPriceInUSD',
+        field: 'collectible.fmvInUsd',
         status: 'shown',
         use: '"FMV $ 172" pill in the header and in every dialog; 80%-of-FMV warning when accepting an offer',
       },
@@ -167,14 +142,9 @@ export const coverage: EndpointCoverage[] = [
         use: 'Second carousel slide + thumbnail',
       },
       {
-        field: 'collectible.frontWithoutStandImageUrl',
-        status: 'unused',
-        use: 'Not displayed',
-      },
-      {
         field: 'collectible.attributes[]',
         status: 'shown',
-        use: '"Card Details" rows Serial and Language. Grader, Grade, Year, Set and Card Number come from the fields above',
+        use: 'Header row 1 "PSA 8 NM-MT · 2025 · Set" and row 2 "#number name"; every attribute is a "Card Details" row',
       },
       {
         field: 'pricing.top_offer',
@@ -195,7 +165,7 @@ export const coverage: EndpointCoverage[] = [
   },
   {
     id: 'orders',
-    endpoint: 'GET /v2/marketplace/cards/{tokenId}/orders',
+    endpoint: 'GET /v2/marketplace/collectibles/{tokenId}/orders',
     sdk: 'fetchCardOrders()',
     fields: [
       { field: 'tokenId', status: 'sdk', use: 'Echo of the path parameter' },
