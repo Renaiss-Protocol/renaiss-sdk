@@ -65,7 +65,7 @@ export enum MarketplaceV2Sort {
   Year = 'year',
   Price = 'priceRange',
   AskPrice = 'askPriceInUSDT',
-  FmvPrice = 'fmvPriceInUsd',
+  FmvPrice = 'fmvInUsd',
 }
 export enum MarketplaceLanguage {
   English = 'English',
@@ -206,7 +206,7 @@ export function fetchCardV2(
   if (!parsed.success)
     return async () => invalid('Invalid token ID', parsed.error);
   return pipe(
-    ctx.service.get('/v2/marketplace/cards/{tokenId}', {
+    ctx.service.get('/v2/marketplace/collectibles/{tokenId}', {
       path: parsed.data,
       signal: request.signal,
     }),
@@ -223,7 +223,7 @@ export function fetchCardOrdersV2(
   if (!parsed.success)
     return async () => invalid('Invalid token ID', parsed.error);
   return pipe(
-    ctx.service.get('/v2/marketplace/cards/{tokenId}/orders', {
+    ctx.service.get('/v2/marketplace/collectibles/{tokenId}/orders', {
       path: parsed.data,
       signal: request.signal,
     }),

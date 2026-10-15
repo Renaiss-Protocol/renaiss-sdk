@@ -13,9 +13,16 @@ import {
   addressSchema,
   buildGachaPullTypedData,
   bytes32Schema,
+  EoaActivitiesResponseSchema,
+  type EoaActivity,
+  EoaActivityFilter,
   type EoaBuybackOffer,
   EoaBuybackOfferSchema,
+  EoaCollectionResponseSchema,
+  EoaCollectionSort,
+  EoaCollectionSummarySchema,
   EoaContentsResponseSchema,
+  EoaDrawStatusSchema,
   EoaHistoryResponseSchema,
   EoaMachineResponseSchema,
   EoaMachinesResponseSchema,
@@ -23,14 +30,17 @@ import {
   type EoaPreparedPull,
   EoaPreparedPullSchema,
   EoaPublicHistoryResponseSchema,
-  EoaPullSchema,
   type EoaResolvedPull,
   EoaSignedBuybackSchema,
   EoaSignedPullSchema,
+  EoaSortOrder,
   type EoaStreamEvent,
   EoaStreamEventSchema,
   GachaMachineStage,
+  GachaMachineTierName,
   GachaQuantitySchema,
+  getEoaBuybackTierAt,
+  numericStringSchema,
   SubmitGachaBuybackResponseSchema,
 } from '@renaiss-protocol/schema-validation';
 import { z } from 'zod';
@@ -65,12 +75,40 @@ const listMachinesRequest = pageRequest.extend({
   stage: z.enum(GachaMachineStage).optional(),
 });
 const machinePageRequest = pageRequest.extend(machineRequest.shape);
+const machineContentsRequest = machinePageRequest.extend({
+  /** Only these tiers, from the machine's `tiers[].name`; every tier when omitted. */
+  tiers: z.array(z.enum(GachaMachineTierName)).min(1).optional(),
+});
 const walletPageRequest = pageRequest.extend(walletRequest.shape);
+// The wallet reads take any address: the API reads it in lowercase.
+const walletAddressRequest = z.object({
+  walletAddress: addressSchema.transform(
+    (address) => address.toLowerCase() as `0x${string}`,
+  ),
+});
+const collectionRequest = pageRequest
+  .extend(walletAddressRequest.shape)
+  .extend({
+    sortBy: z.enum(EoaCollectionSort).optional(),
+    sortOrder: z.enum(EoaSortOrder).optional(),
+  })
+  .strict();
+const activitiesRequest = walletAddressRequest
+  .extend({
+    /** Only this kind of activity; every kind when omitted. */
+    filter: z.enum(EoaActivityFilter).optional(),
+    pageSize: z.number().int().min(1).max(50).default(20),
+  })
+  .strict();
 export type EoaListMachinesRequest = z.input<typeof listMachinesRequest>;
 export type EoaMachineRequest = z.input<typeof machineRequest>;
 export type EoaMachinePageRequest = z.input<typeof machinePageRequest>;
+export type EoaMachineContentsRequest = z.input<typeof machineContentsRequest>;
 export type EoaWalletRequest = z.input<typeof walletRequest>;
 export type EoaWalletPageRequest = z.input<typeof walletPageRequest>;
+export type EoaWalletAddressRequest = z.input<typeof walletAddressRequest>;
+export type EoaWalletCollectionRequest = z.input<typeof collectionRequest>;
+export type EoaWalletActivitiesRequest = z.input<typeof activitiesRequest>;
 
 function invalid(error: unknown) {
   return Failed(
@@ -180,25 +218,26 @@ export function fetchEoaMachine(ctx: EoaContext, request: EoaMachineRequest) {
   };
 }
 
-/** Lists display-safe content. Result codes: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. */
+/** Lists display-safe content, optionally only some tiers; the tier filter applies before paging. Result codes: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. */
 export function listEoaContents(
   ctx: EoaContext,
-  request: EoaMachinePageRequest,
+  request: EoaMachineContentsRequest,
 ) {
   return pages(
-    machinePageRequest,
+    machineContentsRequest,
     request,
     (input, offset, limit) => async () => {
       const result = await read(
         ctx.service.get('/v2/gacha/packs/{slug}/content', {
           path: { slug: input.slug },
-          query: { offset, limit },
+          // ServiceClient sends an array comma-separated (`tier=S,A`).
+          query: { offset, limit, tier: input.tiers },
         }),
         EoaContentsResponseSchema,
       )();
       if (isFailed(result)) return result;
-      const { cards, pagination } = getValue(result);
-      return Success({ items: cards, ...pagination });
+      const { collectibles, pagination } = getValue(result);
+      return Success({ items: collectibles, ...pagination });
     },
   );
 }
@@ -253,6 +292,85 @@ export function listEoaWalletPulls(
   );
 }
 
+/** Lists the cards a wallet has: the cards it owns on chain, however it got them, and the cards it pulled with the calling builder that Renaiss still holds for it. A card it pulled with another builder appears once it is delivered on chain. Sort and paging apply to the whole list. Result codes: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. */
+export function listEoaWalletCollection(
+  ctx: EoaContext,
+  request: EoaWalletCollectionRequest,
+) {
+  return pages(
+    collectionRequest,
+    request,
+    (input, offset, limit) => async () => {
+      const result = await read(
+        ctx.service.get('/v2/users/{walletAddress}/collectibles', {
+          builderAuth: ctx.builderAuth,
+          path: { walletAddress: input.walletAddress },
+          query: {
+            sortBy: input.sortBy,
+            sortOrder: input.sortOrder,
+            offset,
+            limit,
+          },
+        }),
+        EoaCollectionResponseSchema,
+      )();
+      if (isFailed(result)) return result;
+      const { collectibles, pagination } = getValue(result);
+      return Success({ items: collectibles, ...pagination });
+    },
+  );
+}
+
+/** Counts and totals the cards of listEoaWalletCollection. Result codes: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. */
+export function fetchEoaWalletCollectionSummary(
+  ctx: EoaContext,
+  request: EoaWalletAddressRequest,
+) {
+  return async () => {
+    const parsed = walletAddressRequest.strict().safeParse(request);
+    if (!parsed.success) return invalid(parsed.error);
+    return read(
+      ctx.service.get('/v2/users/{walletAddress}', {
+        builderAuth: ctx.builderAuth,
+        path: parsed.data,
+      }),
+      EoaCollectionSummarySchema,
+    )();
+  };
+}
+
+/** Lists what a wallet did on chain with cards, newest first: pulls, buybacks and deliveries with any builder, marketplace trades, transfers, mints and redemptions. A pull and a buyback name no card, as on chain. Activities page by event; a transaction's entries can span pages. Result codes: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. */
+export function listEoaWalletActivities(
+  ctx: EoaContext,
+  request: EoaWalletActivitiesRequest,
+): Paginated<EoaActivity[]> {
+  return paginate(
+    (cursor) => async (): Promise<Result<Page<EoaActivity[]>>> => {
+      const parsed = activitiesRequest.safeParse(request);
+      if (!parsed.success) return invalid(parsed.error);
+      // The API's own cursor: a decimal position in the wallet's history.
+      if (cursor !== undefined && !/^\d+$/.test(cursor))
+        return invalid('Invalid pagination cursor');
+      const { walletAddress, filter, pageSize } = parsed.data;
+      const result = await read(
+        ctx.service.get('/v2/users/{walletAddress}/activities', {
+          builderAuth: ctx.builderAuth,
+          path: { walletAddress },
+          query: { filter, cursor, limit: pageSize },
+        }),
+        EoaActivitiesResponseSchema,
+      )();
+      if (isFailed(result)) return result;
+      const { activities, nextCursor } = getValue(result);
+      return Success({
+        items: activities,
+        hasMore: nextCursor !== null,
+        nextCursor: nextCursor ?? undefined,
+      });
+    },
+  );
+}
+
 const statusRequest = walletRequest.extend({ permitFundTxHash: bytes32Schema });
 export type EoaDrawStatusRequest = z.input<typeof statusRequest>;
 /** Recovers a paid pull by funding hash; never resubmits funding. Result codes: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. */
@@ -268,7 +386,7 @@ export function fetchEoaDrawStatus(
         builderAuth: ctx.builderAuth,
         query: parsed.data,
       }),
-      EoaPullSchema,
+      EoaDrawStatusSchema,
     )();
   };
 }
@@ -675,10 +793,19 @@ export function submitEoaPull(
 const buybackRequest = walletRequest.extend({
   chainId: z.number().int().positive(),
   token: addressSchema,
+  /** Total price the caller confirmed, in 18-decimal USDT units. */
+  expectedAmountInUsdt: numericStringSchema,
   offers: z.array(EoaBuybackOfferSchema).min(1).max(10),
 });
 export type EoaCreateBuybackRequest = z.input<typeof buybackRequest>;
-/** Signs compatible unexpired offers with an exact bigint sum. Result codes: WRONG_REQUEST_PARAMS, GACHA_SIGNING_FAILED. No NFT approval is required. */
+/**
+ * Signs compatible offers at the price of each one's current tier, with an
+ * exact bigint sum that must match expectedAmountInUsdt before signing. If a
+ * tier ends before the buyback reaches Renaiss, the
+ * submit returns GACHA_V3_BUYBACK_PRICE_CHANGED: fetch the offers again and
+ * sign again. Result codes: WRONG_REQUEST_PARAMS, GACHA_SIGNING_FAILED. No NFT
+ * approval is required.
+ */
 export function createEoaBuyback(
   ctx: EoaContext,
   request: EoaCreateBuybackRequest,
@@ -688,7 +815,23 @@ export function createEoaBuyback(
       const parsed = buybackRequest.safeParse(request);
       if (!parsed.success) return invalid(parsed.error);
       if (!ctx.signer) return invalid('A signer is required');
-      const { offers, buyerWalletAddress, chainId, token } = parsed.data;
+      const {
+        offers,
+        buyerWalletAddress,
+        chainId,
+        token,
+        expectedAmountInUsdt,
+      } = parsed.data;
+      const now = Date.now();
+      const prices = offers.map((offer) => {
+        const tier = getEoaBuybackTierAt(offer, now);
+        return tier ? BigInt(tier.amountInUsdt) : 0n;
+      });
+      const amount = prices.reduce((sum, price) => sum + price, 0n);
+      if (amount !== BigInt(expectedAmountInUsdt))
+        return invalid(
+          'Buyback price changed. Read the offers again and confirm the updated amount.',
+        );
       const first = offers[0];
       if (
         !first ||
@@ -707,18 +850,15 @@ export function createEoaBuyback(
           (o) =>
             o.cardPackId !== first.cardPackId ||
             o.vendingMachineAddress.toLowerCase() !==
-              first.vendingMachineAddress.toLowerCase() ||
-            Date.parse(o.expiresAt) <= Date.now() ||
-            BigInt(o.amountInUsdt) <= 0n,
-        )
+              first.vendingMachineAddress.toLowerCase(),
+        ) ||
+        // An offer whose tiers have all ended, or whose current tier pays
+        // nothing, cannot be sold now.
+        prices.some((price) => price <= 0n)
       )
         return invalid(
           'Offers must be unique, unexpired, positive, from one pack and contract, and signed by the buyer on the expected chain',
         );
-      const amount = offers.reduce(
-        (sum, offer) => sum + BigInt(offer.amountInUsdt),
-        0n,
-      );
       const buybackIds = offers.map((offer) => offer.settlementId);
       const userSignature = await ctx.signer.signTypedData({
         domain: {

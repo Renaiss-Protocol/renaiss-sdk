@@ -22,20 +22,19 @@ export function splitCardName(name: string): SplitCardName {
 }
 
 export function cardDisplayRows(card: {
-  gradingCompany: string;
-  grade: string;
-  year: number;
-  setName: string;
-  cardNumber: string;
-  pokemonName: string;
+  attributes: { key: string; value: string }[];
 }): { firstRow: string[]; secondRow: string } {
+  // The API leaves out empty attributes.
+  const trait = (name: string) =>
+    card.attributes.find((attribute) => attribute.key === name)?.value ?? '';
+  const cardNumber = trait('Card Number');
   return {
     firstRow: [
-      `${card.gradingCompany} ${card.grade}`,
-      String(card.year),
-      card.setName,
-    ],
-    secondRow: `#${card.cardNumber} ${card.pokemonName}`,
+      `${trait('Grader')} ${trait('Grade')}`.trim(),
+      trait('Year'),
+      trait('Set'),
+    ].filter((row) => row !== ''),
+    secondRow: `${cardNumber ? `#${cardNumber} ` : ''}${trait('Character')}`,
   };
 }
 

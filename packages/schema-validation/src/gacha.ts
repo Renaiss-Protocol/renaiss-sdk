@@ -20,11 +20,8 @@ export enum GachaMachineStage {
   Archived = 'archived',
 }
 
-export enum GachaQuantity {
-  Single = 1,
-  Five = 5,
-  Ten = 10,
-}
+/** The most cards one /v2 pull takes. */
+export const MAX_GACHA_PULL_QUANTITY = 10;
 
 export enum GachaMachineTierName {
   Top = 'TOP',
@@ -42,11 +39,12 @@ export enum GachaMachineTierName {
   Bloom = 'bloom',
   Crown = 'crown',
 }
-export const GachaQuantitySchema = z.union([
-  z.literal(GachaQuantity.Single),
-  z.literal(GachaQuantity.Five),
-  z.literal(GachaQuantity.Ten),
-]);
+/** Cards in one /v2 pull: any whole number from 1 to MAX_GACHA_PULL_QUANTITY. */
+export const GachaQuantitySchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_GACHA_PULL_QUANTITY);
 const GachaMachineTierChanceSchema = z.union([
   z.number(),
   z.literal('UNDER-1-PERCENT'),
@@ -75,6 +73,8 @@ export const GachaPullHistoryEntrySchema = z.object({
   tier: z.string(),
   buybackBaseValueInUsd: numericStringSchema,
   frontImageUrl: z.string(),
+  /** The card alone: no slab, grade label, frame or background. */
+  imageUrl: z.string(),
 });
 
 export type GachaPullHistoryEntry = z.infer<typeof GachaPullHistoryEntrySchema>;

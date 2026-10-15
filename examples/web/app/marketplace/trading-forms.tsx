@@ -97,9 +97,9 @@ function DialogCard({ card }: { card: CardDetail }) {
           </div>
           <div className={styles.metaLine2}>{secondRow}</div>
         </div>
-        {card.fmvPriceInUsd !== null ? (
+        {card.fmvInUsd !== null ? (
           <FmvBadge
-            cents={card.fmvPriceInUsd}
+            cents={card.fmvInUsd}
             updatedAt={card.fmvUpdatedAt}
             size='large'
           />
@@ -639,8 +639,7 @@ export function AcceptOfferDialog({
   const amount = BigInt(bid.amountInUsdt);
   const receive = (amount * BPS) / (BPS + feeBps);
   const fee = amount - receive;
-  const fmvUsdt =
-    card.fmvPriceInUsd === null ? null : usdToUsdt(card.fmvPriceInUsd);
+  const fmvUsdt = card.fmvInUsd === null ? null : usdToUsdt(card.fmvInUsd);
   const belowFmv = fmvUsdt !== null && amount * 10n < fmvUsdt * 8n;
   return (
     <Dialog
@@ -685,10 +684,10 @@ export function AcceptOfferDialog({
           <span>You will receive</span>
           <span>$ {usdt(receive, 2)}</span>
         </div>
-        {card.fmvPriceInUsd !== null && (
+        {card.fmvInUsd !== null && (
           <div className={styles.breakdownRow}>
             <span>FMV</span>
-            <span>$ {usd(card.fmvPriceInUsd, 2)}</span>
+            <span>$ {usd(card.fmvInUsd, 2)}</span>
           </div>
         )}
       </div>

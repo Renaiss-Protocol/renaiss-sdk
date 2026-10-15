@@ -1,4 +1,4 @@
-import type { GachaPermit2TypedData, GachaQuantity } from './gacha';
+import type { GachaPermit2TypedData } from './gacha';
 
 /**
  * EIP-712 struct for a Permit2 witness transfer carrying a gacha pull.
@@ -32,7 +32,7 @@ type BuildGachaPullTypedDataInput = {
   chainId: number;
   deadline: number;
   nonce: string;
-  numOfTokens: GachaQuantity;
+  numOfTokens: number;
   onChainPackId: string;
   permit2Address: string;
   usdtAddress: string;

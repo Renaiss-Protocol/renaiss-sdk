@@ -9,5 +9,8 @@
     "@renaiss-protocol/fp": "0.1.0-beta.0",
     "@renaiss-protocol/schema-validation": "0.1.0-beta.0"
   },
-  "changesets": []
+  "changesets": [
+    "v2-collectibles-api",
+    "wallet-collection-any-quantity"
+  ]
 }

@@ -75,6 +75,51 @@ export function isListWalletPullsError(
 }
 
 import {
+  V2_LIST_WALLET_COLLECTION_ERROR_CODES,
+  type V2ListWalletCollectionErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2ListWalletCollectionErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows ListWalletCollection failures to its documented Result codes; never throws. */
+export function isListWalletCollectionError(
+  error: ApiError,
+): error is ApiError<V2ListWalletCollectionErrorCode> {
+  return (V2_LIST_WALLET_COLLECTION_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
+  V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES,
+  type V2FetchWalletCollectionSummaryErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2FetchWalletCollectionSummaryErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows FetchWalletCollectionSummary failures to its documented Result codes; never throws. */
+export function isFetchWalletCollectionSummaryError(
+  error: ApiError,
+): error is ApiError<V2FetchWalletCollectionSummaryErrorCode> {
+  return (
+    V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES as readonly string[]
+  ).includes(error.code);
+}
+
+import {
+  V2_LIST_WALLET_ACTIVITIES_ERROR_CODES,
+  type V2ListWalletActivitiesErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2ListWalletActivitiesErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows ListWalletActivities failures to its documented Result codes; never throws. */
+export function isListWalletActivitiesError(
+  error: ApiError,
+): error is ApiError<V2ListWalletActivitiesErrorCode> {
+  return (V2_LIST_WALLET_ACTIVITIES_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
   V2_FETCH_GACHA_DRAW_STATUS_ERROR_CODES,
   type V2FetchGachaDrawStatusErrorCode,
 } from '@renaiss-protocol/error-codes';
