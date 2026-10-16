@@ -113,7 +113,7 @@ function OrderDetail({ requestId }: { requestId: string }) {
     ? trackingStageIndex(order.status, order.shipmentStatus)
     : 0;
   const split = order
-    ? splitOrderCards(order.cards, order.tokenStatuses)
+    ? splitOrderCards(order.collectibles, order.tokenStatuses)
     : null;
 
   return (
@@ -252,7 +252,7 @@ function OrderDetail({ requestId }: { requestId: string }) {
                 {split.available.length === 1 ? '' : 's'}
               </span>
               <span className={`${styles.small} ${styles.muted}`}>
-                Vault: {vaultNames(order.cards) || '—'}
+                Vault: {vaultNames(order.collectibles) || '—'}
               </span>
               <div className={styles.summaryList}>
                 {split.available.map((card) => (
@@ -270,7 +270,7 @@ function OrderDetail({ requestId }: { requestId: string }) {
                     <div className={styles.summaryItemBody}>
                       <span className={styles.itemName}>{card.name}</span>
                       <FmvBadge
-                        cents={card.fmvPriceInUsd}
+                        cents={card.fmvInUsd}
                         updatedAt={card.fmvUpdatedAt}
                       />
                     </div>
@@ -297,7 +297,7 @@ function OrderDetail({ requestId }: { requestId: string }) {
                       <div className={styles.summaryItemBody}>
                         <span className={styles.itemName}>{card.name}</span>
                         <FmvBadge
-                          cents={card.fmvPriceInUsd}
+                          cents={card.fmvInUsd}
                           updatedAt={card.fmvUpdatedAt}
                         />
                       </div>
@@ -327,8 +327,8 @@ function OrderDetail({ requestId }: { requestId: string }) {
             <div className={styles.card}>
               <FeeBreakdown
                 fees={order.fees}
-                fmv={sumFmv(order.cards)}
-                count={order.cards.length}
+                fmv={sumFmv(order.collectibles)}
+                count={order.collectibles.length}
                 showShippingTooltip={false}
               />
             </div>

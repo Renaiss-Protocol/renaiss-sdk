@@ -134,9 +134,9 @@ export function CardDetailView({
                   ? `$ ${usdt(detail.askPriceInUsdt, 18)}`
                   : 'Unlisted'}
               </span>
-              {detail.fmvPriceInUsd !== null && (
+              {detail.fmvInUsd !== null && (
                 <FmvBadge
-                  cents={detail.fmvPriceInUsd}
+                  cents={detail.fmvInUsd}
                   updatedAt={detail.fmvUpdatedAt}
                 />
               )}
@@ -509,23 +509,9 @@ function MediaColumn({ detail }: { detail: CardDetail }) {
   );
 }
 
-/** "Card Details": seven rows, built from the flat fields plus Serial / Language attributes. */
+/** "Card Details": the collectible type, then its attributes in API order. */
 function CardDetails({ detail }: { detail: CardDetail }) {
   const [open, setOpen] = useState(true);
-  const attribute = (trait: string) =>
-    detail.attributes.find((a) => a.trait === trait)?.value;
-  const rows: [string, string | undefined][] = [
-    ['Grader', detail.gradingCompany],
-    ['Serial', attribute('Serial')],
-    ['Grade', detail.grade],
-    ['Year', String(detail.year)],
-    ['Set', detail.setName],
-    ['Language', attribute('Language')],
-    ['Card Number', detail.cardNumber],
-  ];
-  const extras = detail.attributes.filter(
-    (a) => a.trait !== 'Serial' && a.trait !== 'Language',
-  );
   return (
     <div className={styles.section}>
       <button
@@ -539,15 +525,13 @@ function CardDetails({ detail }: { detail: CardDetail }) {
       </button>
       {open && (
         <div className={styles.detailsRows}>
-          {rows.map(([label, value]) => (
-            <div key={label} className={styles.detailsRow}>
-              <span className={styles.muted}>{label}</span>
-              <span>{value ?? '—'}</span>
-            </div>
-          ))}
-          {extras.map((a) => (
-            <div key={a.trait} className={styles.detailsRow}>
-              <span className={styles.muted}>{a.trait}</span>
+          <div className={styles.detailsRow}>
+            <span className={styles.muted}>Type</span>
+            <span>{detail.type}</span>
+          </div>
+          {detail.attributes.map((a) => (
+            <div key={a.key} className={styles.detailsRow}>
+              <span className={styles.muted}>{a.key}</span>
               <span>{a.value}</span>
             </div>
           ))}
