@@ -16,7 +16,9 @@ export {
 } from '@renaiss-protocol/fp';
 export {
   type EoaBuybackOffer,
+  type EoaBuybackTier,
   type EoaMachine,
+  type EoaMachineBuybackTier,
   type EoaMachineContent,
   type EoaMachineDetail,
   type EoaMachineTier,
@@ -31,6 +33,7 @@ export {
   GachaQuantity,
   type SubmitGachaBuybackResponse,
 } from '@renaiss-protocol/schema-validation';
+export { currentBuybackTier } from './actions/gacha-v2';
 export type {
   EoaCreateBuybackRequest,
   EoaDrawStatusRequest,
@@ -99,10 +102,10 @@ export {
   type AcceptBidQuote,
   type AskQuote,
   type BidQuote,
-  type CardAttribute,
   type CardDetailV2 as CardDetail,
   type CardOrdersV2 as CardOrders,
   type CardOwner,
+  type CollectibleAttribute,
   type MarketplaceCancellationV2 as MarketplaceCancellation,
   MarketplaceCardCategory,
   type MarketplaceCardV2 as MarketplaceCard,

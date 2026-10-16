@@ -41,12 +41,17 @@ export enum PriceToken {
   Usd = 'USD',
 }
 
-export const CardAttributeSchema = z.object({
-  trait: z.string(),
+/**
+ * One detail of a collectible as a key and value pair. For a card the keys are,
+ * in order: Grader, Grade, Cert Number, Year, Set, Card Number, Character,
+ * Language. A key without a value is left out, and every value is a string.
+ */
+export const CollectibleAttributeSchema = z.object({
+  key: z.string(),
   value: z.string(),
 });
 
-export type CardAttribute = z.infer<typeof CardAttributeSchema>;
+export type CollectibleAttribute = z.infer<typeof CollectibleAttributeSchema>;
 
 const CardOwnerSchema = z.object({
   username: z.string(),

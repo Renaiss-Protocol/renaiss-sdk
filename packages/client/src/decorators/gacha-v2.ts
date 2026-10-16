@@ -73,7 +73,7 @@ export type EoaGachaActions = {
   /**
    * Read one machine by `slug`, including its tiers with whole-set percentages
    * and price ranges, `activeSetExpectedValueInUsd` (the mean card value of the
-   * whole set) and buyback terms. Requires no builder key or signer. Result
+   * whole set) and `buybackConfig`, the buyback tiers a new pull gets. Requires no builder key or signer. Result
    * failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with isFetchGachaMachineError.
    * @throws Never; errors are Result values.
    */
@@ -176,10 +176,13 @@ export type EoaGachaActions = {
     request: EoaSubmitPullRequest,
   ): Promise<Result<EoaResolvedPull>>;
   /**
-   * Sign a buyback of 1 to 10 offers from `fetchGachaBuybackOffers`. The offers
-   * must be unique, unexpired, positive and from one pack and contract, and
-   * `chainId`, `token` and the signer must match the selected network. The
-   * signed amount is the exact sum of the offers. No NFT approval is needed.
+   * Sign a buyback of 1 to 10 offers from `fetchGachaBuybackOffers`. Each offer
+   * is priced by its current tier at signing time (see `currentBuybackTier`);
+   * every offer must have a price above zero now. The offers must be unique and
+   * from one pack and contract, and `chainId`, `token` and the signer must match
+   * the selected network. The signed amount is the exact sum of those prices.
+   * Submit soon after signing: a tier that ends first makes the submission fail.
+   * No NFT approval is needed.
    * Requires a signer. Result failures: WRONG_REQUEST_PARAMS,
    * GACHA_SIGNING_FAILED. Narrow with isCreateGachaBuybackError.
    * @throws Never; errors are Result values.
@@ -188,9 +191,11 @@ export type EoaGachaActions = {
     request: EoaCreateBuybackRequest,
   ): Promise<Result<EoaSignedBuyback>>;
   /**
-   * Submit a signed buyback once. If it fails because an offer expired or the
-   * delivery is in doubt, read the offers again with `fetchGachaBuybackOffers`
-   * before signing a new buyback. Needs the builder key, set as `builderApiKey` or added by your proxy. Result failures:
+   * Submit a signed buyback once. If it fails because an offer expired, a tier
+   * ended after signing (GACHA_V2_REQUEST_FAILED with status 409, keeping the
+   * API's GACHA_V3_BUYBACK_PRICE_CHANGED error in `ApiError.error`) or the delivery is in
+   * doubt, read the offers again with `fetchGachaBuybackOffers` before signing a
+   * new buyback. Needs the builder key, set as `builderApiKey` or added by your proxy. Result failures:
    * WRONG_REQUEST_PARAMS, INVALID_SCHEMA, GACHA_V2_REQUEST_FAILED, UNKNOWN_ERROR. Narrow with isSubmitGachaBuybackError.
    * @throws Never; errors are Result values.
    */
