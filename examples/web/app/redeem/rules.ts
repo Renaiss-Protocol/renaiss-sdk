@@ -92,14 +92,12 @@ export function vaultNames(
   return names.join(' / ');
 }
 
-export function sumFmv(
-  cards: { fmvPriceInUsd: bigint | null }[],
-): bigint | null {
+export function sumFmv(cards: { fmvInUsd: bigint | null }[]): bigint | null {
   let total = 0n;
   let any = false;
   for (const card of cards) {
-    if (card.fmvPriceInUsd === null) continue;
-    total += card.fmvPriceInUsd;
+    if (card.fmvInUsd === null) continue;
+    total += card.fmvInUsd;
     any = true;
   }
   return any ? total : null;

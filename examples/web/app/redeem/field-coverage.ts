@@ -16,7 +16,7 @@ export type FieldUse = {
 export type EndpointId =
   | 'config'
   | 'session'
-  | 'cards'
+  | 'collectibles'
   | 'regions'
   | 'validate'
   | 'quotes'
@@ -51,7 +51,7 @@ function cardFields(prefix: string, withAcquired: boolean): FieldUse[] {
       use: 'Slab image on tiles, table, cart, summary',
     },
     {
-      field: `${prefix}.fmvPriceInUsd`,
+      field: `${prefix}.fmvInUsd`,
       status: 'shown',
       use: 'FMV pill; Total FMV box (summed)',
     },
@@ -148,11 +148,11 @@ export const coverage: EndpointCoverage[] = [
     ],
   },
   {
-    id: 'cards',
-    endpoint: 'GET /v2/redeem/cards',
+    id: 'collectibles',
+    endpoint: 'GET /v2/redeem/collectibles',
     sdk: 'listRedeemableCards()',
     fields: [
-      ...cardFields('cards[]', true),
+      ...cardFields('collectibles[]', true),
       {
         field: 'total',
         status: 'shown',
@@ -393,22 +393,22 @@ export const coverage: EndpointCoverage[] = [
         use: 'Stage label',
       },
       {
-        field: 'orders[].cards[].tokenId',
+        field: 'orders[].collectibles[].tokenId',
         status: 'derived',
         use: 'React key',
       },
       {
-        field: 'orders[].cards[].name',
+        field: 'orders[].collectibles[].name',
         status: 'shown',
         use: 'Image alt text only',
       },
       {
-        field: 'orders[].cards[].frontImageUrl',
+        field: 'orders[].collectibles[].frontImageUrl',
         status: 'shown',
         use: 'Image grid (first 3 + "+N")',
       },
       {
-        field: 'orders[].cards[].fmvPriceInUsd',
+        field: 'orders[].collectibles[].fmvInUsd',
         status: 'shown',
         use: 'Summed FMV pill ("N/A" when none)',
       },
@@ -514,7 +514,7 @@ export const coverage: EndpointCoverage[] = [
         status: 'shown',
         use: '"last record update" only; not shown as vault-release date',
       },
-      ...cardFields('cards[]', false).map((f) =>
+      ...cardFields('collectibles[]', false).map((f) =>
         f.field.endsWith('regionCountryCode') ||
         f.field.endsWith('vaultDisplayName')
           ? { ...f, use: '"Vault: …" line' }

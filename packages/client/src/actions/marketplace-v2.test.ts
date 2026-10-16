@@ -233,6 +233,45 @@ describe('v2 marketplace boundaries', () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
+  it('reads a collectible with its attributes and no FMV', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        expect(new URL(url).pathname).toBe(
+          `/v2/marketplace/collectibles/${tokenId}`,
+        );
+        return Response.json({
+          collectible: {
+            tokenId,
+            name: 'Card',
+            ownerAddress: account.address,
+            askPriceInUSDT: 'NO-ASK-PRICE',
+            fmvInUsd: 'NO-FMV-PRICE',
+            fmvUpdatedAt: null,
+            frontImageUrl: 'https://example.com/slab.png',
+            type: 'POKEMON',
+            attributes: [
+              { key: 'Grader', value: 'PSA' },
+              { key: 'Year', value: '2025' },
+            ],
+            owner: null,
+          },
+          pricing: { top_offer: null, last_sale: null, price_history: [] },
+        });
+      }),
+    );
+    const card = value(await client().fetchCard({ tokenId }));
+    expect(card).toMatchObject({
+      type: 'POKEMON',
+      askPriceInUsdt: null,
+      fmvInUsd: null,
+      backImageUrl: null,
+      attributes: [
+        { key: 'Grader', value: 'PSA' },
+        { key: 'Year', value: '2025' },
+      ],
+    });
+  });
   it.each([
     '2021-2025',
     '2026+',
@@ -251,19 +290,11 @@ describe('v2 marketplace boundaries', () => {
           {
             tokenId,
             name: 'Card',
-            setName: 'Set',
-            cardNumber: '1',
-            pokemonName: 'Pikachu',
             ownerAddress: account.address,
             askPriceInUSDT: amount,
-            fmvPriceInUSD: '9007199254740993123',
+            fmvInUsd: '9007199254740993123',
+            fmvUpdatedAt: null,
             frontImageUrl: 'https://example.com/slab.png',
-            attributes: [],
-            owner: null,
-            vaultLocation: 'platform',
-            gradingCompany: 'PSA',
-            grade: '10',
-            year: 2025,
           },
         ],
         pagination: {
@@ -286,6 +317,7 @@ describe('v2 marketplace boundaries', () => {
     const first = value(await pages.firstPage());
     expect(first.items[0]?.askPriceInUsdt).toBe(amount);
     expect(first.items[0]?.frontImageUrl).toContain('slab');
+    expect(first.items[0]?.fmvInUsd).toBe('9007199254740993123');
     expect(first.nextCursor).toBeDefined();
     const all = [];
     for await (const page of pages) all.push(value(page));

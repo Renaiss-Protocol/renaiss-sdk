@@ -65,6 +65,30 @@ describe('demo builder proxy boundary', () => {
     );
     expect(new Headers(calls[0]?.headers).has('x-builder-api-key')).toBe(false);
   });
+  it('forwards public marketplace collectible reads without the builder credential', async () => {
+    const calls: [string, RequestInit][] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push([url, init]);
+        return Response.json({});
+      }),
+    );
+    for (const path of [
+      'v2/marketplace',
+      'v2/marketplace/collectibles/1',
+      'v2/marketplace/collectibles/1/orders',
+    ]) {
+      const response = await GET(
+        new Request(`${origin}/api/renaiss/${path}`),
+        context(path),
+      );
+      expect(response.status).toBe(200);
+      const [url, init] = calls.at(-1) ?? [];
+      expect(String(url)).toContain(`/${path}`);
+      expect(new Headers(init?.headers).has('x-builder-api-key')).toBe(false);
+    }
+  });
   it('rejects cross-origin writes, unknown paths, traversal and oversized bodies before forwarding', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
@@ -191,7 +215,7 @@ describe('demo builder proxy boundary', () => {
       }),
     );
     for (const path of [
-      'v2/redeem/cards',
+      'v2/redeem/collectibles',
       'v2/redeem/orders',
       `v2/redeem/orders/0x${'aa'.repeat(32)}`,
     ]) {
@@ -212,10 +236,16 @@ describe('demo builder proxy boundary', () => {
       expect(headers.has('cookie')).toBe(false);
     }
   });
-  it('does not forward removed configuration routes', async () => {
+  it('does not forward removed or renamed routes', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
-    for (const path of ['v2/marketplace/config', 'v2/redeem/config']) {
+    for (const path of [
+      'v2/marketplace/config',
+      'v2/redeem/config',
+      'v2/redeem/cards',
+      'v2/marketplace/cards/1',
+      'v2/marketplace/cards/1/orders',
+    ]) {
       const response = await GET(
         new Request(`${origin}/api/renaiss/${path}`),
         context(path),
@@ -259,13 +289,13 @@ describe('demo builder proxy boundary', () => {
     expect(
       (
         await GET(
-          new Request(`${origin}/api/renaiss/v2/redeem/cards`, {
+          new Request(`${origin}/api/renaiss/v2/redeem/collectibles`, {
             headers: {
               origin: 'https://other.example',
               authorization: 'Bearer rnws_at_fixture',
             },
           }),
-          context('v2/redeem/cards'),
+          context('v2/redeem/collectibles'),
         )
       ).status,
     ).toBe(403);

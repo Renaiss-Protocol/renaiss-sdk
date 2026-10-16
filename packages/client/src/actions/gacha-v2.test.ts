@@ -17,7 +17,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BNB_TESTNET, createGachaClient } from '../index';
+import { BNB_TESTNET, createGachaClient, currentBuybackTier } from '../index';
 import { signerFrom } from '../viem';
 
 // Publicly known test key: it must never hold funds.
@@ -74,14 +74,12 @@ function machineDetail() {
     stage: 'active',
     description: 'Pack description',
     expectedValueInUsd: null,
-    featuredCardFmvInUsd: null,
     packBannerVideoUrl: null,
     gachaMachineVideoUrl: null,
     gachaRippingPackAnimationVideoUrl: null,
     tiers: [],
     activeSetExpectedValueInUsd: '1000',
-    buybackPercentage: 85,
-    buybackWindowSeconds: 600,
+    buybackConfig: [{ buybackPercentage: 85, buybackExpiredInSeconds: 600 }],
   };
 }
 function expectation() {
@@ -118,14 +116,15 @@ const resolved = {
       tokenId: '9007199254740993000',
       releaseTxHash: null,
       buybackTxHash: null,
+      tier: 'S',
+      buybackBaseValueInUSD: '1000',
       collectible: {
+        type: 'POKEMON',
         name: 'Pokémon',
-        setName: 'Set',
-        imageUrl: 'https://test.example/item.png',
         frontImageUrl: 'https://test.example/front.png',
-        tier: 'S',
-        buybackBaseValueInUSD: '1000',
-        snapshotBuybackValueInUsdt: amount,
+        fmvInUsd: '1200',
+        fmvUpdatedAt: new Date().toISOString(),
+        attributes: [{ key: 'Set', value: 'Set' }],
       },
     },
   ],
@@ -267,7 +266,7 @@ describe('v2 EOA signing and stream boundaries', () => {
     const fetch = vi.fn(async (url: string | URL | Request) => {
       const path = new URL(String(url)).pathname;
       if (path.endsWith('/content'))
-        return Response.json({ cards: [card], pagination });
+        return Response.json({ collectibles: [card], pagination });
       if (path.endsWith('/pull-history'))
         return Response.json({ pulls: [], pagination });
       if (path.endsWith('/packs'))
@@ -594,9 +593,14 @@ describe('v2 EOA signing and stream boundaries', () => {
       cardPackId: packId,
       settlementId: `0x${String(n).repeat(64)}`,
       tokenId: String(n),
-      amountInUsdt: amount,
-      expiresAt: new Date(Date.now() + 600_000).toISOString(),
       vendingMachineAddress: tvm,
+      buybackTiers: [
+        {
+          buybackPercentage: 85,
+          amountInUsdt: amount,
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        },
+      ],
     }));
     const client = createGachaClient({
       baseUrl: 'https://test.example',
@@ -623,6 +627,75 @@ describe('v2 EOA signing and stream boundaries', () => {
     expect(isFailed(duplicate) && getError(duplicate).code).toBe(
       'WRONG_REQUEST_PARAMS',
     );
+  });
+  it('signs the price of the tier in effect, not an ended or tied higher tier', async () => {
+    const at = (ms: number) => new Date(Date.now() + ms).toISOString();
+    const offer = {
+      cardPackId: packId,
+      settlementId: `0x${'1'.repeat(64)}`,
+      tokenId: '1',
+      vendingMachineAddress: tvm,
+      // Unsorted on purpose; the 90% tier has ended, and two tiers share an end.
+      buybackTiers: [
+        { buybackPercentage: 75, amountInUsdt: '750', expiresAt: at(600_000) },
+        { buybackPercentage: 80, amountInUsdt: '800', expiresAt: at(600_000) },
+        { buybackPercentage: 90, amountInUsdt: '900', expiresAt: at(-1000) },
+      ],
+    };
+    expect(currentBuybackTier(offer)?.amountInUsdt).toBe('750');
+    const client = createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+      expectedChainId: 97,
+    });
+    const signed = value(
+      await client.createGachaBuyback({
+        buyerWalletAddress: account.address,
+        chainId: 97,
+        token,
+        offers: [offer],
+      }),
+    );
+    expect(signed.buybackAuth.amount).toBe('750');
+  });
+  it('refuses to sign an offer on hold or past its last tier', async () => {
+    const at = (ms: number) => new Date(Date.now() + ms).toISOString();
+    const offer = (
+      n: number,
+      tiers: { amountInUsdt: string; ms: number }[],
+    ) => ({
+      cardPackId: packId,
+      settlementId: `0x${String(n).repeat(64)}`,
+      tokenId: String(n),
+      vendingMachineAddress: tvm,
+      buybackTiers: tiers.map(({ amountInUsdt, ms }) => ({
+        buybackPercentage: amountInUsdt === '0' ? 0 : 90,
+        amountInUsdt,
+        expiresAt: at(ms),
+      })),
+    });
+    const onHold = offer(1, [
+      { amountInUsdt: '0', ms: 600_000 },
+      { amountInUsdt: amount, ms: 1_200_000 },
+    ]);
+    const ended = offer(2, [{ amountInUsdt: amount, ms: -1000 }]);
+    expect(currentBuybackTier(ended)).toBeUndefined();
+    const client = createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+      expectedChainId: 97,
+    });
+    for (const offers of [[onHold], [ended]]) {
+      const result = await client.createGachaBuyback({
+        buyerWalletAddress: account.address,
+        chainId: 97,
+        token,
+        offers,
+      });
+      expect(isFailed(result) && getError(result).code).toBe(
+        'WRONG_REQUEST_PARAMS',
+      );
+    }
   });
   it('normalizes new upstream codes without losing the original code', async () => {
     vi.stubGlobal(
@@ -683,9 +756,14 @@ describe('fetchGachaBuybackOffers pages', () => {
     cardPackId: packId,
     settlementId: `0x${n.toString(16).padStart(64, '0')}`,
     tokenId: String(n),
-    amountInUsdt: amount,
-    expiresAt: new Date(Date.now() + 600_000).toISOString(),
     vendingMachineAddress: tvm,
+    buybackTiers: [
+      {
+        buybackPercentage: 85,
+        amountInUsdt: amount,
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      },
+    ],
   });
   const client = () =>
     createGachaClient({

@@ -4,6 +4,8 @@
  * two-decimal USDT input the dialogs accept.
  */
 
+import type { CollectibleAttribute } from '@renaiss-protocol/client';
+
 const USDT_UNIT = 10n ** 18n;
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -21,22 +23,30 @@ export function splitCardName(name: string): SplitCardName {
   };
 }
 
+type CardDisplayRows = { firstRow: string[]; secondRow: string };
+
+/**
+ * Header rows from a collectible's attributes: "PSA 8 · 1999 · Base Set" and
+ * "#4 Charizard". Keys without a value are left out; a collectible with none
+ * of these keys falls back to its name.
+ */
 export function cardDisplayRows(card: {
-  gradingCompany: string;
-  grade: string;
-  year: number;
-  setName: string;
-  cardNumber: string;
-  pokemonName: string;
-}): { firstRow: string[]; secondRow: string } {
-  return {
-    firstRow: [
-      `${card.gradingCompany} ${card.grade}`,
-      String(card.year),
-      card.setName,
-    ],
-    secondRow: `#${card.cardNumber} ${card.pokemonName}`,
-  };
+  name: string;
+  attributes: CollectibleAttribute[];
+}): CardDisplayRows {
+  const attribute = (key: string) =>
+    card.attributes.find((a) => a.key === key)?.value ?? '';
+  const grade = [attribute('Grader'), attribute('Grade')]
+    .filter(Boolean)
+    .join(' ');
+  const firstRow = [grade, attribute('Year'), attribute('Set')].filter(Boolean);
+  const number = attribute('Card Number');
+  const secondRow = [number && `#${number}`, attribute('Character')]
+    .filter(Boolean)
+    .join(' ');
+  if (firstRow.length === 0 && !secondRow)
+    return { firstRow, secondRow: card.name };
+  return { firstRow, secondRow };
 }
 
 function parseIso(value: string): number | null {

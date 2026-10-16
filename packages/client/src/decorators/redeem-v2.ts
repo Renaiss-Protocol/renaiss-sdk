@@ -73,7 +73,7 @@ export type RedemptionActions = {
   fetchRedemptionCheckout(
     request: RedemptionCheckoutRequest,
   ): Promise<Result<RedemptionCheckout>>;
-  /** Read one of this wallet's orders by `requestId`: status, per-token statuses, address, recipient, courier, estimated delivery range, fees (without a total), tracking fields, `createdAt`, `updatedAt` and cards. Requires a wallet access token. Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, UNKNOWN_ERROR, REDEMPTION_V2_REQUEST_FAILED, REDEMPTION_SESSION_REQUIRED. Narrow with isFetchRedemptionOrderError. @throws Never; errors are Result values. */
+  /** Read one of this wallet's orders by `requestId`: status, per-token statuses, address, recipient, courier, estimated delivery range, fees (without a total), tracking fields, `createdAt`, `updatedAt` and `collectibles`. Requires a wallet access token. Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, UNKNOWN_ERROR, REDEMPTION_V2_REQUEST_FAILED, REDEMPTION_SESSION_REQUIRED. Narrow with isFetchRedemptionOrderError. @throws Never; errors are Result values. */
   fetchRedemptionOrder(
     request: RedemptionOrderRequest,
   ): Promise<Result<RedemptionOrder>>;
@@ -81,7 +81,7 @@ export type RedemptionActions = {
   syncRedemptionTracking(
     request: RedemptionOrderRequest,
   ): Promise<Result<RedemptionOrder>>;
-  /** Page through the cards this wallet can redeem. Optional `search`, `countryCode`, `sortBy` (`RedemptionCardSort`), `sortOrder` (`RedemptionSortOrder`) and `pageSize` (1 to 50, default 50). Each card has `tokenId`, `name`, `frontImageUrl`, `fmvPriceInUsd`, `fmvUpdatedAt`, `ownerAcquiredAt`, `regionCountryCode` and `vaultDisplayName`; pages carry `totalCount` and `hasMore`. Requires a wallet access token. Paginated; Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, UNKNOWN_ERROR, REDEMPTION_V2_REQUEST_FAILED, REDEMPTION_SESSION_REQUIRED. Narrow with isListRedeemableCardsError. @throws Never; errors are Result values. */
+  /** Page through the cards this wallet can redeem. Optional `search`, `countryCode`, `sortBy` (`RedemptionCardSort`), `sortOrder` (`RedemptionSortOrder`) and `pageSize` (1 to 50, default 50). Each card has `tokenId`, `name`, `frontImageUrl`, `fmvInUsd`, `fmvUpdatedAt`, `ownerAcquiredAt`, `regionCountryCode` and `vaultDisplayName`; pages carry `totalCount` and `hasMore`. Requires a wallet access token. Paginated; Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, UNKNOWN_ERROR, REDEMPTION_V2_REQUEST_FAILED, REDEMPTION_SESSION_REQUIRED. Narrow with isListRedeemableCardsError. @throws Never; errors are Result values. */
   listRedeemableCards(
     request?: ListRedeemableCardsRequest,
   ): Paginated<RedeemableCard[]>;

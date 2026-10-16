@@ -747,9 +747,8 @@ export interface paths {
                                 description: string;
                                 /** @description Pack purchase price in 18-decimal USDT units, serialized as a decimal string. */
                                 priceInUsdt: string;
-                                /** @description Stored pack EV metadata in USD cents, serialized as a decimal string; null when unset. For v3 machine display use activeSetExpectedValueInUsd from GET /v2/gacha/packs/{slug}. This field is not recomputed from active or remaining cards. */
+                                /** @description Stored pack EV metadata in USD cents, serialized as a decimal string; null when unset. For v3 machine display use activeSetExpectedValueInUsd from GET /v2/gacha/packs/{slug}. This field is not recomputed from active or remaining collectibles. */
                                 expectedValueInUsd: string | null;
-                                featuredCardFmvInUsd: string | null;
                                 packBannerVideoUrl: string | null;
                                 gachaMachineVideoUrl: string | null;
                                 gachaRippingPackAnimationVideoUrl: string | null;
@@ -819,14 +818,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Preview the VRF pack's eligible card catalog
-         * @description Preview the cards eligible for this pack, with images, tiers and catalog buyback values. Pagination totals count eligible catalog entries. They do not indicate remaining inventory or guarantee which card a future pull will reveal. Get an actual buyback offer after the pull resolves.
+         * Preview the VRF pack's eligible collectible catalog
+         * @description Preview the collectibles eligible for this pack, with images, tiers and catalog buyback values. Pagination totals count eligible catalog entries. They do not indicate remaining inventory or guarantee which collectible a future pull will reveal. Get an actual buyback offer after the pull resolves.
          */
         get: {
             parameters: {
                 query?: {
                     limit?: number;
                     offset?: number | null;
+                    tier?: (("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown"))[];
                 };
                 header?: never;
                 path: {
@@ -843,11 +843,25 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            cards: {
+                            collectibles: {
                                 name: string;
                                 tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
                                 buybackBaseValueInUsd: string;
                                 frontImageUrl: string;
+                                /**
+                                 * @description The collectible's category.
+                                 * @enum {string}
+                                 */
+                                type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market. Null for a collectible that has none yet. */
+                                fmvInUsd: string | null;
+                                /** @description When fmvInUsd was last updated. Null without one. */
+                                fmvUpdatedAt: string | null;
+                                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                                attributes: {
+                                    key: string;
+                                    value: string;
+                                }[];
                             }[];
                             pagination: {
                                 total: number;
@@ -965,7 +979,7 @@ export interface paths {
         };
         /**
          * Get VRF gacha pack pull history
-         * @description Returns cards pulled from this pack, newest first, without repeated pack metadata. A limited pack has no public pull history: the list is always empty. Read buybackWindowSeconds from GET /v2/gacha/packs/{slug}. A pull appears here only after its buyback window has closed. The feed therefore runs behind live activity by that window, which is 24 hours on most public packs. The delay is intentional: while the window is open the puller can still sell the card back, so the feed waits until every entry is settled one way or the other. Every entry is on-chain by the time it shows up and can be checked at https://fair.renaiss.xyz/verify-a-rip. No pull time is returned, since any timestamp would describe the reveal rather than the pull. Pagination uses hasMore and covers recent activity. Deep pages may be incomplete, so this feed is not a complete historical export.
+         * @description Returns collectibles pulled from this pack, newest first, without repeated pack metadata. A limited pack has no public pull history: the list is always empty. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A pull appears here only after its buyback window has closed. The feed therefore runs behind live activity by that window, which is 24 hours on most public packs. The delay is intentional: while the window is open the puller can still sell the collectible back, so the feed waits until every entry is settled one way or the other. Every entry is on-chain by the time it shows up and can be checked at https://fair.renaiss.xyz/verify-a-rip. No pull time is returned, since any timestamp would describe the reveal rather than the pull. Pagination uses hasMore and covers recent activity. Deep pages may be incomplete, so this feed is not a complete historical export.
          */
         get: {
             parameters: {
@@ -995,6 +1009,11 @@ export interface paths {
                                 buybackBaseValueInUsd: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
+                                /**
+                                 * Format: uri
+                                 * @description The collectible alone, cut out of the slab photo: no slab, grade label, frame or background. It is the photo of this catalog collectible, which can be of another graded copy. A collectible without one gets its frontImageUrl here.
+                                 */
+                                imageUrl: string;
                             }[];
                             pagination: {
                                 limit: number;
@@ -1111,7 +1130,7 @@ export interface paths {
         };
         /**
          * Get VRF gacha pack by slug
-         * @description Returns public metadata, whole-set rounded tier percentages, storefront catalog value ranges and headline buyback percentage. expectedValueInUsd is stored pack metadata; activeSetExpectedValueInUsd is the whole-set mean used by the renaiss.xyz v3 machine. Neither EV describes remaining undrawn cards. Monetary values are decimal strings: USD uses 2 decimals, USDT uses 18.
+         * @description Returns public metadata, whole-set rounded tier percentages, storefront catalog value ranges and headline buyback percentage. expectedValueInUsd is stored pack metadata; activeSetExpectedValueInUsd is the whole-set mean used by the renaiss.xyz v3 machine. Neither EV describes remaining undrawn collectibles. Monetary values are decimal strings: USD uses 2 decimals, USDT uses 18.
          */
         get: {
             parameters: {
@@ -1144,9 +1163,8 @@ export interface paths {
                                 description: string;
                                 /** @description Pack purchase price in 18-decimal USDT units, serialized as a decimal string. */
                                 priceInUsdt: string;
-                                /** @description Stored pack EV metadata in USD cents, serialized as a decimal string; null when unset. For v3 machine display use activeSetExpectedValueInUsd from GET /v2/gacha/packs/{slug}. This field is not recomputed from active or remaining cards. */
+                                /** @description Stored pack EV metadata in USD cents, serialized as a decimal string; null when unset. For v3 machine display use activeSetExpectedValueInUsd from GET /v2/gacha/packs/{slug}. This field is not recomputed from active or remaining collectibles. */
                                 expectedValueInUsd: string | null;
-                                featuredCardFmvInUsd: string | null;
                                 packBannerVideoUrl: string | null;
                                 gachaMachineVideoUrl: string | null;
                                 gachaRippingPackAnimationVideoUrl: string | null;
@@ -1155,20 +1173,23 @@ export interface paths {
                                 tiers: {
                                     tier: number;
                                     name: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
-                                    /** @description Whole-set tier percentage, rounded to the nearest integer; a positive percentage below 1 is UNDER-1-PERCENT. Rounded tiers need not sum to 100. This is not the probability among remaining undrawn cards. */
+                                    /** @description Whole-set tier percentage, rounded to the nearest integer; a positive percentage below 1 is UNDER-1-PERCENT. Rounded tiers need not sum to 100. This is not the probability among remaining undrawn collectibles. */
                                     chance: number | "UNDER-1-PERCENT";
-                                    /** @description Storefront catalog display range in USD cents, serialized as decimal strings. Min is the configured tier floor; max is the next higher tier's floor, or the public catalog maximum for the highest tier. Not active-set or remaining-card values; not a guaranteed prize range. */
+                                    /** @description Storefront catalog display range in USD cents, serialized as decimal strings. Min is the configured tier floor; max is the next higher tier's floor, or the public catalog maximum for the highest tier. Not active-set or remaining-collectible values; not a guaranteed prize range. */
                                     priceRangeInUsd: {
                                         min: string;
                                         max: string;
                                     };
                                 }[];
-                                /** @description Mean base card value across every slot in the selected active set, including cards already drawn, in USD cents, rounded half-up to the nearest cent; 0 for an empty set. This is the EV displayed by the renaiss.xyz v3 machine, before buyback percentage, not the EV of remaining cards or a guaranteed return. */
+                                /** @description Mean base collectible value across every slot in the selected active set, including collectibles already drawn, in USD cents, rounded half-up to the nearest cent; 0 for an empty set. This is the EV displayed by the renaiss.xyz v3 machine, before buyback percentage, not the EV of remaining collectibles or a guaranteed return. */
                                 activeSetExpectedValueInUsd: string;
-                                /** @description Storefront headline instant-buyback percentage, e.g. 85 means 85%. Prefers the selected set's frozen payout percentage; uses the soonest-expiring configured buyback tier only when snapshots cannot supply it. Null when neither exists. Read the buyer's offer for the actual amount and expiry. */
-                                buybackPercentage: number | null;
-                                /** @description Longest buyback window across the pack's tiers. Pulls stay out of GET /v2/gacha/packs/{slug}/pull-history for this long after they resolve. */
-                                buybackWindowSeconds: number;
+                                /** @description The pack's buyback tiers, soonest end first. A draw resolved now gets these tiers and keeps them: a later change to the pack reaches new draws only. A buyback pays the percent of the first tier whose buybackExpiredInSeconds has not passed since the draw resolved; a tier still applies at that second. The largest buybackExpiredInSeconds is the longest window: a collectible is released, and a pull appears in GET /v2/gacha/packs/{slug}/pull-history, only after it. Empty when the pack has no tiers. Read GET /v2/gacha/buyback/offers for the actual amount and expiry. */
+                                buybackConfig: {
+                                    /** @description Share of the collectible's base value the buyback pays, e.g. 85 means 85%. */
+                                    buybackPercentage: number;
+                                    /** @description How long after the draw this tier lasts, in seconds. */
+                                    buybackExpiredInSeconds: number;
+                                }[];
                             };
                         };
                     };
@@ -1295,7 +1316,7 @@ export interface paths {
                         /** Format: uuid */
                         packId: string;
                         /** @default 1 */
-                        quantity?: 1 | 5 | 10;
+                        quantity?: number;
                     };
                 };
             };
@@ -1350,7 +1371,7 @@ export interface paths {
                                 /** Format: uuid */
                                 packId: string;
                                 builderCode: string;
-                                numOfTokens: 1 | 5 | 10;
+                                numOfTokens: number;
                                 amountPerToken: string;
                                 nonce: string;
                                 deadline: number;
@@ -1370,7 +1391,7 @@ export interface paths {
                  *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form. Fix the request and send it again. Served as `{ code, message }`. It is also served as `{ error, code }` when the wallet is a delegated account, which this API does not support: use another wallet.
                  *     - `API_AUTH_INVALID_INPUT`: the request body is larger than 16 KB. Send a smaller body. Served as `{ error, code }`.
                  *     - `CARD_PACK_NOT_ACTIVE`: the pack is not on sale. Do not retry; show the pack as unavailable.
-                 *     - `CONTRACT_WALLET_CANNOT_RECEIVE_NFT`: the wallet is a contract that cannot receive the card. Use a wallet that can receive cards.
+                 *     - `CONTRACT_WALLET_CANNOT_RECEIVE_NFT`: the wallet is a contract that cannot receive the collectible. Use a wallet that can receive collectibles.
                  */
                 400: {
                     headers: {
@@ -1531,8 +1552,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Submit a signed pull and stream through card resolution
-         * @description Requires a builder key AND a valid Permit2 wallet action signature over the full pull payload. No wallet access token is required. Emits pull_started, payment_queued, payment_submitting, payment_confirmed, then draws_resolved with all purchased cards. Only draws_resolved means success; pull_failed ends an unsuccessful stream. See GachaV2PullStreamEvent for payload schemas. Every result belongs to the builder identified by your API key and the requested buyer wallet. Save permitFundTxHash from payment_confirmed; use draw-status/history to recover after disconnect or timeout. Do not automatically retry an uncertain submission or sign a fresh nonce before reconciling the original purchase.
+         * Submit a signed pull and stream through collectible resolution
+         * @description Requires a builder key AND a valid Permit2 wallet action signature over the full pull payload. No wallet access token is required. Emits pull_started, payment_queued, payment_submitting, payment_confirmed, then draws_resolved with all purchased collectibles. Only draws_resolved means success; pull_failed ends an unsuccessful stream. See GachaV2PullStreamEvent for payload schemas. Every result belongs to the builder identified by your API key and the requested buyer wallet. Save permitFundTxHash from payment_confirmed; use draw-status/history to recover after disconnect or timeout. Do not automatically retry an uncertain submission or sign a fresh nonce before reconciling the original purchase.
          */
         post: {
             parameters: {
@@ -1546,7 +1567,7 @@ export interface paths {
                     "application/json": {
                         /** Format: uuid */
                         packId: string;
-                        numOfTokens: 1 | 5 | 10;
+                        numOfTokens: number;
                         amountPerToken: string;
                         nonce: string;
                         deadline: number;
@@ -1568,7 +1589,7 @@ export interface paths {
                  *     | `payment_queued` | The payment is waiting to be sent. |
                  *     | `payment_submitting` | The payment is being sent. |
                  *     | `payment_confirmed` | The payment is confirmed. Save `permitFundTxHash`. |
-                 *     | `draws_resolved` | Terminal, success. The cards are assigned. |
+                 *     | `draws_resolved` | Terminal, success. The collectibles are assigned. |
                  *     | `pull_failed` | Terminal, failure. Can arrive at any point. |
                  *
                  *     Every `data` is a JSON object. These fields are in every event, in this order (named schema `GachaV2PullStreamProgressData`):
@@ -1578,7 +1599,7 @@ export interface paths {
                  *     | `buyerWalletAddress` | address | The wallet that signed the pull. |
                  *     | `packId` | uuid | The pack being pulled. |
                  *     | `nonce` | string | The nonce of the signed pull. |
-                 *     | `numOfTokens` | integer | How many cards the pull buys: 1, 5 or 10. |
+                 *     | `numOfTokens` | integer | How many collectibles the pull buys: 1 to 10. |
                  *     | `message` | string | A short sentence for display. |
                  *
                  *     `payment_confirmed` adds (schema `GachaV2PullStreamPaymentConfirmedData`):
@@ -1595,17 +1616,20 @@ export interface paths {
                  *     | `packName` | string | The pack name. |
                  *     | `status` | string | Always `RESOLVED`. |
                  *     | `pulledAt` | date-time or null | When the funding transaction was mined. |
-                 *     | `draws` | array | One entry per card, in order. |
-                 *     | `draws[].settlementId` | hash | Identifies this card for a buyback. |
-                 *     | `draws[].tokenId` | string | The card's token id. |
-                 *     | `draws[].releaseTxHash` | hash or null | Set once the card was sent to the wallet. |
-                 *     | `draws[].buybackTxHash` | hash or null | Set once the card was sold back. |
-                 *     | `draws[].collectible.name` | string | The card name. |
-                 *     | `draws[].collectible.frontImageUrl` | url | Front image. |
-                 *     | `draws[].collectible.imageUrl` | url | Display image. |
-                 *     | `draws[].collectible.tier` | string | The card's tier. |
-                 *     | `draws[].collectible.buybackBaseValueInUSD` | string | Base value in USD cents. |
-                 *     | `draws[].collectible.snapshotBuybackValueInUsdt` | string or null | Buyback value in USDT with 18 decimals. |
+                 *     | `draws` | array | One entry per collectible, in order. |
+                 *     | `draws[].settlementId` | hash | Identifies this collectible for a buyback. |
+                 *     | `draws[].tokenId` | string | The collectible's token id. |
+                 *     | `draws[].releaseTxHash` | hash or null | Set once the collectible was sent to the wallet. |
+                 *     | `draws[].buybackTxHash` | hash or null | Set once the collectible was sold back. |
+                 *     | `draws[].tier` | string | The collectible's tier for this draw. |
+                 *     | `draws[].buybackBaseValueInUSD` | string | Base value in USD cents, frozen for this draw. |
+                 *     | `draws[].collectible` | object | What the drawn collectible is. Same shape as in `GET /v2/gacha/draw-status`. |
+                 *     | `draws[].collectible.type` | string | The collectible's category: POKEMON, ONE_PIECE or SPORTS. |
+                 *     | `draws[].collectible.name` | string | Grade, year, set, number and title. |
+                 *     | `draws[].collectible.frontImageUrl` | url | The graded slab in its Renaiss frame, on a dark background. |
+                 *     | `draws[].collectible.fmvInUsd` | string or null | Current market value in USD cents, as on renaiss.xyz; not the buyback value. |
+                 *     | `draws[].collectible.fmvUpdatedAt` | date-time or null | When `fmvInUsd` was last updated. |
+                 *     | `draws[].collectible.attributes` | array | `{ trait, value }` pairs: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. Empty traits are left out. |
                  *
                  *     `pull_failed` adds (schema `GachaV2PullStreamFailedData`):
                  *
@@ -1624,18 +1648,18 @@ export interface paths {
                  *
                  *     - `GACHA_V3_STREAM_TIMEOUT`: the stream ran for 90 seconds without a result. The payment may still be going through.
                  *     - `GACHA_V3_DRAW_UPDATES_UNAVAILABLE`: live updates are not available. The payment was confirmed. Do not pull again: read `GET /v2/gacha/draw-status` with the funding transaction hash.
-                 *     - `GACHA_V3_DRAW_REVEAL_FAILED`: the card details could not be loaded. The payment was confirmed. Do not pull again: read `GET /v2/gacha/draw-status` with the funding transaction hash.
-                 *     - `GACHA_V3_RESOLVE_DRAWS_FAILED`: the cards could not be assigned yet. The payment was confirmed. Do not pull again: read `GET /v2/gacha/draw-status` with the funding transaction hash.
+                 *     - `GACHA_V3_DRAW_REVEAL_FAILED`: the collectible details could not be loaded. The payment was confirmed. Do not pull again: read `GET /v2/gacha/draw-status` with the funding transaction hash.
+                 *     - `GACHA_V3_RESOLVE_DRAWS_FAILED`: the collectibles could not be assigned yet. The payment was confirmed. Do not pull again: read `GET /v2/gacha/draw-status` with the funding transaction hash.
                  *     - `EOA_PURCHASE_REJECTED`: the pull was refused or could not be finished. The message may say why, for example that the deadline is not within the next five minutes.
                  *     - `PERMIT_EXPIRED`: the signed pull expired before it was sent, so no payment was made. You can prepare a new pull and sign it again.
                  *     - `WRONG_REQUEST_PARAMS`: the wallet cannot be used for this pull. Use another wallet. You can prepare a new pull after fixing it.
-                 *     - `CONTRACT_WALLET_CANNOT_RECEIVE_NFT`: the wallet is a contract that cannot receive the card. Use a wallet that can receive cards. You can prepare a new pull after fixing it.
+                 *     - `CONTRACT_WALLET_CANNOT_RECEIVE_NFT`: the wallet is a contract that cannot receive the collectible. Use a wallet that can receive collectibles. You can prepare a new pull after fixing it.
                  *     - `INSUFFICIENT_ALLOWANCE`: the wallet has not approved enough USDT for this pull. Approve at least the required amount from the prepare response. You can prepare a new pull after fixing it.
                  *     - `INSUFFICIENT_USDT_AMOUNT`: the wallet does not hold enough USDT. Add funds.
                  *     - `CARD_PACK_NOT_FOUND`: the pack does not exist. Do not retry.
                  *     - `CARD_PACK_NOT_ACTIVE`: the pack is not on sale. Do not retry; show the pack as unavailable.
-                 *     - `GACHA_V3_NO_SELLABLE_LINEUP`: the pack has no cards ready to sell. Try again later.
-                 *     - `GACHA_V3_NOT_ENOUGH_CARDS_IN_SET`: the pack has fewer cards left than you asked for. Try a smaller quantity or try again later.
+                 *     - `GACHA_V3_NO_SELLABLE_LINEUP`: the pack has no collectibles ready to sell. Try again later.
+                 *     - `GACHA_V3_NOT_ENOUGH_CARDS_IN_SET`: the pack has fewer collectibles left than you asked for. Try a smaller quantity or try again later.
                  *     - `GACHA_V3_PRICE_MISMATCH`: the pack price changed after you prepared the pull. Prepare again and sign the new data.
                  *     - `PERMIT2_NONCE_ALREADY_USED`: this signed pull was already used. Do not sign it again.
                  *     - `GACHA_V3_CHECKOUT_ALREADY_PROCESSED`: this pull was already processed. Do not pull again.
@@ -1658,11 +1682,11 @@ export interface paths {
                  *     ```
                  *     ```
                  *     event: payment_confirmed
-                 *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Payment confirmed. Resolving your cards.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a"}
+                 *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Payment confirmed. Resolving your collectibles.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a"}
                  *     ```
                  *     ```
                  *     event: draws_resolved
-                 *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your cards are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","status":"RESOLVED","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"collectible":{"name":"Example Card","frontImageUrl":"https://example.com/cards/example-front.png","imageUrl":"https://example.com/cards/example.png","tier":"rare","buybackBaseValueInUSD":"4500","snapshotBuybackValueInUsdt":"38250000000000000000"}}]}
+                 *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your collectibles are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","status":"RESOLVED","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"tier":"rare","buybackBaseValueInUSD":"4500","collectible":{"type":"POKEMON","name":"PSA 10 Gem Mint 2025 Example Set #001 Example Collectible","frontImageUrl":"https://example.com/collectibles/example-front.png","fmvInUsd":"5200","fmvUpdatedAt":"2026-01-14T08:00:00.000Z","attributes":[{"key":"Grader","value":"PSA"},{"key":"Grade","value":"10 Gem Mint"},{"key":"Cert Number","value":"PSA00000001"},{"key":"Year","value":"2025"},{"key":"Set","value":"Example Set"},{"key":"Card Number","value":"001"},{"key":"Character","value":"Example Collectible"},{"key":"Language","value":"English"}]}}]}
                  *     ```
                  *     ```
                  *     event: pull_failed
@@ -1685,10 +1709,10 @@ export interface paths {
                          *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your payment transaction is being submitted."}
                          *
                          *     event: payment_confirmed
-                         *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Payment confirmed. Resolving your cards.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a"}
+                         *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Payment confirmed. Resolving your collectibles.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a"}
                          *
                          *     event: draws_resolved
-                         *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your cards are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","status":"RESOLVED","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"collectible":{"name":"Example Card","frontImageUrl":"https://example.com/cards/example-front.png","imageUrl":"https://example.com/cards/example.png","tier":"rare","buybackBaseValueInUSD":"4500","snapshotBuybackValueInUsdt":"38250000000000000000"}}]}
+                         *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your collectibles are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","status":"RESOLVED","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"tier":"rare","buybackBaseValueInUSD":"4500","collectible":{"type":"POKEMON","name":"PSA 10 Gem Mint 2025 Example Set #001 Example Collectible","frontImageUrl":"https://example.com/collectibles/example-front.png","fmvInUsd":"5200","fmvUpdatedAt":"2026-01-14T08:00:00.000Z","attributes":[{"key":"Grader","value":"PSA"},{"key":"Grade","value":"10 Gem Mint"},{"key":"Cert Number","value":"PSA00000001"},{"key":"Year","value":"2025"},{"key":"Set","value":"Example Set"},{"key":"Card Number","value":"001"},{"key":"Character","value":"Example Collectible"},{"key":"Language","value":"English"}]}}]}
                          */
                         "text/event-stream": string;
                     };
@@ -1863,7 +1887,7 @@ export interface paths {
         };
         /**
          * Get the status of one of this builder's pulls by confirmed funding transaction
-         * @description Requires only the builder API key. The requested wallet and funding transaction must belong to the verified builder code; another builder's transaction returns 404. Omit wallet access tokens. For fairness to the pack's users, cards stay with Renaiss during their buyback windows. Read buybackWindowSeconds from GET /v2/gacha/packs/{slug}. A card that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
+         * @description Requires only the builder API key. The requested wallet and funding transaction must belong to the verified builder code; another builder's transaction returns 404. Omit wallet access tokens. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
          */
         get: {
             parameters: {
@@ -1899,6 +1923,37 @@ export interface paths {
                                 tokenId: string;
                                 releaseTxHash: string | null;
                                 buybackTxHash: string | null;
+                                /** @description The collectible's tier for this draw. Null when the collectible details could not be loaded. */
+                                tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown") | null;
+                                /** @description The collectible's base buyback value in USD cents. Null when the collectible details could not be loaded. */
+                                buybackBaseValueInUSD: string | null;
+                                /** @description What the drawn collectible is. Null when the collectible details could not be loaded. */
+                                collectible: {
+                                    /**
+                                     * @description The collectible's category.
+                                     * @enum {string}
+                                     */
+                                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                    /** @description Grade, year, set, number and title. */
+                                    name: string;
+                                    /**
+                                     * Format: uri
+                                     * @description The graded slab in its Renaiss frame, on a dark background.
+                                     */
+                                    frontImageUrl: string;
+                                    /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market and is not the buyback value. Null for a collectible that has none yet. */
+                                    fmvInUsd: string | null;
+                                    /**
+                                     * Format: date-time
+                                     * @description When fmvInUsd was last updated. Null without one.
+                                     */
+                                    fmvUpdatedAt: string | null;
+                                    /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                                    attributes: {
+                                        key: string;
+                                        value: string;
+                                    }[];
+                                } | null;
                             }[];
                         };
                     };
@@ -2063,7 +2118,7 @@ export interface paths {
         };
         /**
          * List a wallet's resolved pulls for this builder, grouped by funding transaction
-         * @description Requires only the builder API key. Filters by the requested wallet and the builder code from that key before pagination. No records from another builder are returned. Omit wallet access tokens. For fairness to the pack's users, cards stay with Renaiss during their buyback windows. Read buybackWindowSeconds from GET /v2/gacha/packs/{slug}. A card that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
+         * @description Requires only the builder API key. Filters by the requested wallet and the builder code from that key before pagination. No records from another builder are returned. Omit wallet access tokens. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
          */
         get: {
             parameters: {
@@ -2245,7 +2300,7 @@ export interface paths {
         };
         /**
          * List a wallet's eligible buybacks for this builder
-         * @description Requires only the builder API key. Returns eligible draws for the requested wallet attributed to the builder code from that key. Omit wallet access tokens. Accepting a buyback still requires the wallet's action signature. For fairness to the pack's users, cards stay with Renaiss during their buyback windows. Read buybackWindowSeconds from GET /v2/gacha/packs/{slug}. A card that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
+         * @description Requires only the builder API key. Returns eligible draws for the requested wallet attributed to the builder code from that key. Omit wallet access tokens. Accepting a buyback still requires the wallet's action signature. Each offer lists its buyback tiers in buybackTiers: the price now is the amountInUsdt of the first tier whose expiresAt has not passed, and the offer ends at the expiresAt of its last positive-amount buybackTiers item. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
          */
         get: {
             parameters: {
@@ -2271,9 +2326,16 @@ export interface paths {
                                 cardPackId: string;
                                 settlementId: string;
                                 tokenId: string;
-                                amountInUsdt: string;
-                                expiresAt: string;
                                 vendingMachineAddress: string;
+                                /** @description Every buyback tier of this collectible, past ones too, soonest end first. The price now is the amountInUsdt of the first tier whose expiresAt has not passed; a tier still applies at its expiresAt. A buyback signs the sum of those prices over its collectibles. If a tier ends before the buyback reaches Renaiss, the buyback returns 409 GACHA_V3_BUYBACK_PRICE_CHANGED: read the offers again and sign the new amount. The offer ends at the expiresAt of the last positive-amount buybackTiers item. */
+                                buybackTiers: {
+                                    /** @description Percent of the card's base value, e.g. 90 means 90%. */
+                                    buybackPercentage: number;
+                                    /** @description Price in USDT with 18 decimals in this tier. */
+                                    amountInUsdt: string;
+                                    /** @description When this tier ends. The tier still applies at that moment. */
+                                    expiresAt: string;
+                                }[];
                             }[];
                         };
                     };
@@ -2461,11 +2523,11 @@ export interface paths {
                  *     - `API_AUTH_INVALID_INPUT`: the request body is larger than 16 KB. Send a smaller body. Served as `{ error, code }`.
                  *     - `EOA_PURCHASE_REJECTED`: the wallet cannot be used for this buyback. Use another wallet. Served as `{ error, code }`.
                  *     - `PERPETUAL_GACHA_PACK_VERIFY_BUYBACK_FAILED`: the signed token is not USDT. Prepare the buyback again from the offers list.
-                 *     - `GACHA_V3_TOKEN_STATUS_INVALID`: a card in the request was already sold back or sent to the wallet. Read `GET /v2/gacha/buyback/offers` and sign again for the cards that are still offered.
-                 *     - `GACHA_V3_BUYBACK_VERIFY_FAILED`: the wallet does not own a card in the request, or the signed amount does not match the offers. Read `GET /v2/gacha/buyback/offers` and sign the amounts it returns.
-                 *     - `GACHA_V3_BUYBACK_EXPIRED`: the buyback window of a card in the request has closed. Do not retry that card.
+                 *     - `GACHA_V3_TOKEN_STATUS_INVALID`: a collectible in the request was already sold back or sent to the wallet. Read `GET /v2/gacha/buyback/offers` and sign again for the collectibles that are still offered.
+                 *     - `GACHA_V3_BUYBACK_VERIFY_FAILED`: the wallet does not own a collectible in the request. Read `GET /v2/gacha/buyback/offers` and sign only the collectibles it returns.
+                 *     - `GACHA_V3_BUYBACK_EXPIRED`: no tier pays for a collectible now (window closed or a zero-percent hold). Read `GET /v2/gacha/buyback/offers` again and retry only the collectibles it returns.
                  *     - `GACHA_V3_CHECKOUT_ALREADY_PROCESSED`: this buyback was already processed. Read `GET /v2/gacha/buyback/offers` before you send it again.
-                 *     - `CONTRACT_REVERT`: the buyback was rejected. Read `GET /v2/gacha/buyback/offers` to see which cards are still offered, then sign again.
+                 *     - `CONTRACT_REVERT`: the buyback was rejected. Read `GET /v2/gacha/buyback/offers` to see which collectibles are still offered, then sign again.
                  *     - Other codes can appear when the chain rejects the buyback. Read `GET /v2/gacha/buyback/offers` before you send it again.
                  */
                 400: {
@@ -2543,9 +2605,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description A card or the pack was not found.
+                 * @description A collectible or the pack was not found.
                  *
-                 *     - `EOA_PURCHASE_REJECTED`: one or more of the cards were not pulled by this wallet under your builder key, or the pack was not found. Check the pack id and the settlement ids from `GET /v2/gacha/buyback/offers`.
+                 *     - `EOA_PURCHASE_REJECTED`: one or more of the collectibles were not pulled by this wallet under your builder key, or the pack was not found. Check the pack id and the settlement ids from `GET /v2/gacha/buyback/offers`.
                  *     - Other codes can appear. Read `GET /v2/gacha/buyback/offers` before you send the request again.
                  */
                 404: {
@@ -2567,9 +2629,10 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The buyback conflicts with an earlier one.
+                 * @description The buyback conflicts with an earlier one, or its price changed.
                  *
                  *     - `PERMIT2_NONCE_ALREADY_USED`: this signed buyback was already used. Read `GET /v2/gacha/buyback/offers` before you sign again.
+                 *     - `GACHA_V3_BUYBACK_PRICE_CHANGED`: the signed amount is not the price now: a buyback tier ended after you read the offers. Read `GET /v2/gacha/buyback/offers` again and sign the new amount.
                  *     - Other codes can appear. Read `GET /v2/gacha/buyback/offers` before you send the request again.
                  */
                 409: {
@@ -2772,7 +2835,7 @@ export interface paths {
                 /**
                  * @description The wallet is not allowed to do this.
                  *
-                 *     - `UNAUTHORIZED`: only the owner of the card can list it. Use the wallet that owns the card.
+                 *     - `UNAUTHORIZED`: only the owner of the collectible can list it. Use the wallet that owns the collectible.
                  *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: this route takes a builder key only. Remove the `Authorization` header and any other credential, then send the request again.
                  *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
                  */
@@ -2783,7 +2846,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Only the card owner can list it",
+                         *       "error": "Only the collectible owner can list it",
                          *       "code": "UNAUTHORIZED"
                          *     }
                          */
@@ -2796,9 +2859,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card was not found.
+                 * @description The collectible was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  */
                 404: {
                     headers: {
@@ -2807,7 +2870,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -3018,9 +3081,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card was not found.
+                 * @description The collectible was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  */
                 404: {
                     headers: {
@@ -3029,7 +3092,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -3169,7 +3232,7 @@ export interface paths {
                  * @description The request was refused before anything happened. A body that is not valid JSON is refused with a plain-text 400.
                  *
                  *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form, or the expiry is not a future time within the allowed limit. The text names the field. Fix the request and send it again.
-                 *     - `MATCHING_ASK_NOT_FOUND`: the card has no active listing. Read the listings again; do not retry this request.
+                 *     - `MATCHING_ASK_NOT_FOUND`: the collectible has no active listing. Read the listings again; do not retry this request.
                  *     - `MATCHING_ASK_PERMIT_NOT_FOUND`: the listing cannot be bought. Read the listings again; do not retry this request.
                  */
                 400: {
@@ -3242,9 +3305,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card was not found.
+                 * @description The collectible was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  */
                 404: {
                     headers: {
@@ -3253,7 +3316,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -3474,7 +3537,7 @@ export interface paths {
                 /**
                  * @description The wallet is not allowed to do this.
                  *
-                 *     - `UNAUTHORIZED`: only the owner of the card can accept a bid. Use the wallet that owns the card.
+                 *     - `UNAUTHORIZED`: only the owner of the collectible can accept a bid. Use the wallet that owns the collectible.
                  *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: this route takes a builder key only. Remove the `Authorization` header and any other credential, then send the request again.
                  *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
                  */
@@ -3485,7 +3548,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Only the card owner can accept a bid",
+                         *       "error": "Only the collectible owner can accept a bid",
                          *       "code": "UNAUTHORIZED"
                          *     }
                          */
@@ -3498,10 +3561,10 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card or the bid was not found.
+                 * @description The collectible or the bid was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
-                 *     - `ORDER_NOT_FOUND`: the bid is not active for this card, has expired or does not exist. Read the bids again.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `ORDER_NOT_FOUND`: the bid is not active for this collectible, has expired or does not exist. Read the bids again.
                  */
                 404: {
                     headers: {
@@ -3510,7 +3573,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -3633,8 +3696,8 @@ export interface paths {
                  *     - `OFFER_EXPIRY_TOO_LONG`: the listing expires too far from now. Prepare again with a shorter expiry.
                  *     - `ASK_HAS_ALREADY_EXPIRED`: the listing expired while it was being processed. Prepare again with a later expiry and sign the new data.
                  *     - `INVALID_ASK_SIGNATURE`: the signature on the listing was not accepted. Prepare again and have the wallet sign the new data.
-                 *     - `ASK_TOKEN_ID_MISMATCH`: the signed listing is for another card than the one you sent. Prepare again and sign the new data.
-                 *     - `COLLECTIBLE_ONCHAIN_OWNER_MISMATCH`: the wallet does not own the card. Use the wallet that owns it.
+                 *     - `ASK_TOKEN_ID_MISMATCH`: the signed listing is for another collectible than the one you sent. Prepare again and sign the new data.
+                 *     - `COLLECTIBLE_ONCHAIN_OWNER_MISMATCH`: the wallet does not own the collectible. Use the wallet that owns it.
                  */
                 400: {
                     headers: {
@@ -3707,9 +3770,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card was not found.
+                 * @description The collectible was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  */
                 404: {
                     headers: {
@@ -3718,7 +3781,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -3846,7 +3909,7 @@ export interface paths {
                  *     - `BID_HAS_ALREADY_EXPIRED`: the bid expired while it was being processed. Prepare again with a later expiry and sign the new data.
                  *     - `INVALID_BID_SIGNATURE`: the signature on the bid was not accepted. Prepare again and have the wallet sign the new data.
                  *     - `BID_BELOW_MINIMUM`: the bid is below the smallest bid allowed. Prepare again with a higher amount.
-                 *     - `BID_TOKEN_ID_MISMATCH`: the signed bid is for another card than the one you sent. Prepare again and sign the new data.
+                 *     - `BID_TOKEN_ID_MISMATCH`: the signed bid is for another collectible than the one you sent. Prepare again and sign the new data.
                  *     - `INVALID_BID_FEE_BPS`: the fee in the signed bid is not accepted. Prepare again and sign the new data.
                  *     - `INSUFFICIENT_ALLOWANCE`: the wallet has not approved enough USDT for this bid. Approve the amount, then send the bid again.
                  *     - `BID_INSUFFICIENT_BALANCE`: the wallet holds less USDT than the bid. Add funds or bid less.
@@ -3923,9 +3986,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card was not found.
+                 * @description The collectible was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  */
                 404: {
                     headers: {
@@ -3934,7 +3997,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -3949,7 +4012,7 @@ export interface paths {
                 /**
                  * @description The signed bid was already used.
                  *
-                 *     - `BID_AUTHORIZATION_ALREADY_USED`: this signed bid was already submitted. Check the card and the wallet's orders first: the earlier bid may be active, cancelled or already filled. Sign a new bid only if you still want one.
+                 *     - `BID_AUTHORIZATION_ALREADY_USED`: this signed bid was already submitted. Check the collectible and the wallet's orders first: the earlier bid may be active, cancelled or already filled. Sign a new bid only if you still want one.
                  */
                 409: {
                     headers: {
@@ -4084,10 +4147,10 @@ export interface paths {
                  *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form, the expiry is not a future time within the allowed limit, or the wallet cannot be used for this order. The text names the problem. Fix the request or use another wallet.
                  *     - `BID_HAS_ALREADY_EXPIRED`: the purchase expired while it was being processed. Prepare again with a later expiry and sign the new data.
                  *     - `INVALID_BID_SIGNATURE`: the signature on the purchase was not accepted. Prepare again and have the wallet sign the new data.
-                 *     - `BID_TOKEN_ID_MISMATCH`: the signed purchase is for another card than the one you sent. Prepare again and sign the new data.
+                 *     - `BID_TOKEN_ID_MISMATCH`: the signed purchase is for another collectible than the one you sent. Prepare again and sign the new data.
                  *     - `INVALID_BID_FEE_BPS`: the fee in the signed purchase is not accepted. Prepare again and sign the new data.
                  *     - `INSUFFICIENT_ALLOWANCE`: the wallet has not approved enough USDT for this purchase. Approve the amount, then send the purchase again.
-                 *     - `MATCHING_ASK_NOT_FOUND`: the card has no active listing. Read the listings again; do not retry this request.
+                 *     - `MATCHING_ASK_NOT_FOUND`: the collectible has no active listing. Read the listings again; do not retry this request.
                  *     - `MATCHING_ASK_PERMIT_NOT_FOUND`: the listing cannot be bought. Read the listings again; do not retry this request.
                  *     - `ASK_HAS_ALREADY_EXPIRED`: the listing has expired. Read the listings again; do not retry this request.
                  *     - `INVALID_ASK_SIGNATURE`: the listing can no longer be bought. Read the listings again; do not retry this request.
@@ -4164,9 +4227,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card was not found.
+                 * @description The collectible was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  */
                 404: {
                     headers: {
@@ -4175,7 +4238,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -4212,7 +4275,7 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description A failure on our side. Retry later; before you send the request again, read `GET /v2/marketplace/cards/{tokenId}` to see whether it went through.
+                 * @description A failure on our side. Retry later; before you send the request again, read `GET /v2/marketplace/collectibles/{tokenId}` to see whether it went through.
                  *
                  *     - `API_AUTH_ERROR`: the signature could not be checked because the chain could not be read. Retry the request.
                  */
@@ -4305,9 +4368,9 @@ export interface paths {
                  *     - `MATCHING_BID_PERMIT_NOT_FOUND`: the bid cannot be accepted. Read the bids again; do not retry this request.
                  *     - `ASK_HAS_ALREADY_EXPIRED`: the acceptance expired while it was being processed. Prepare again with a later expiry and sign the new data.
                  *     - `INVALID_ASK_SIGNATURE`: the signature on the acceptance was not accepted. Prepare again and have the wallet sign the new data.
-                 *     - `ASK_TOKEN_ID_MISMATCH`: the signed acceptance is for another card than the one you sent. Prepare again and sign the new data.
-                 *     - `COLLECTIBLE_ONCHAIN_OWNER_MISMATCH`: the wallet does not own the card. Use the wallet that owns it.
-                 *     - `BID_TOKEN_ID_MISMATCH`: the bid is for another card. Read the bids again; do not retry this request.
+                 *     - `ASK_TOKEN_ID_MISMATCH`: the signed acceptance is for another collectible than the one you sent. Prepare again and sign the new data.
+                 *     - `COLLECTIBLE_ONCHAIN_OWNER_MISMATCH`: the wallet does not own the collectible. Use the wallet that owns it.
+                 *     - `BID_TOKEN_ID_MISMATCH`: the bid is for another collectible. Read the bids again; do not retry this request.
                  *     - `INVALID_BID_FEE_BPS`: the bid cannot be accepted. Read the bids again; do not retry this request.
                  *     - `INSUFFICIENT_ALLOWANCE`: the bidder has not approved enough USDT. Read the bids again; do not retry this request.
                  *     - `BID_HAS_ALREADY_EXPIRED`: the bid has expired. Read the bids again; do not retry this request.
@@ -4385,9 +4448,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description The card or the bid was not found.
+                 * @description The collectible or the bid was not found.
                  *
-                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the card is not available on this API. Check the token id. Do not retry with the same id.
+                 *     - `COLLECTIBLE_NOT_FOUND`: the token id is unknown or the collectible is not available on this API. Check the token id. Do not retry with the same id.
                  *     - `OFFER_NOT_FOUND`: the bid does not exist. Read the bids again; do not retry this request.
                  */
                 404: {
@@ -4397,7 +4460,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Card not found",
+                         *       "error": "Collectible not found",
                          *       "code": "COLLECTIBLE_NOT_FOUND"
                          *     }
                          */
@@ -4434,7 +4497,7 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description A failure on our side. Retry later; before you send the request again, read `GET /v2/marketplace/cards/{tokenId}` to see whether it went through.
+                 * @description A failure on our side. Retry later; before you send the request again, read `GET /v2/marketplace/collectibles/{tokenId}` to see whether it went through.
                  *
                  *     - `API_AUTH_ERROR`: the signature could not be checked because the chain could not be read. Retry the request.
                  */
@@ -4894,7 +4957,7 @@ export interface paths {
                     listedOnly?: boolean;
                     limit?: number;
                     offset?: number | null;
-                    sortBy?: "listDate" | "mintDate" | "name" | "year" | "priceRange" | "askPriceInUSDT" | "fmvPriceInUsd";
+                    sortBy?: "listDate" | "mintDate" | "name" | "year" | "priceRange" | "askPriceInUSDT" | "fmvInUsd";
                 };
                 header?: never;
                 path?: never;
@@ -4916,11 +4979,11 @@ export interface paths {
                                 ownerAddress: string;
                                 /** @description 18-decimal USDT base units, or NO-ASK-PRICE */
                                 askPriceInUSDT: string;
-                                /** @description USD cents, or NO-FMV-PRICE */
-                                fmvPriceInUSD: string;
                                 fmvUpdatedAt?: string | null;
                                 /** Format: uri */
                                 frontImageUrl: string;
+                                /** @description USD cents, or NO-FMV-PRICE */
+                                fmvInUsd: string;
                             }[];
                             pagination: {
                                 total: number;
@@ -4965,7 +5028,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v2/marketplace/cards/{tokenId}": {
+    "/v2/marketplace/collectibles/{tokenId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4973,8 +5036,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get public card details and price history
-         * @description Only visible cards are returned. Excludes inventory awaiting release, private reservations and buyback authorizations. No credentials accepted.
+         * Get public collectible details and price history
+         * @description Only visible collectibles are returned. Excludes private reservations and buyback authorizations. A collectible held by the gacha inventory contract (pack stock, or a drawn collectible awaiting release) is returned, with that contract as ownerAddress. No credentials accepted.
          */
         get: {
             parameters: {
@@ -4998,25 +5061,25 @@ export interface paths {
                                 /** @description Decimal token ID, serialized losslessly */
                                 tokenId: string;
                                 name: string;
-                                setName: string;
-                                cardNumber: string;
-                                pokemonName: string;
                                 ownerAddress: string;
                                 /** @description 18-decimal USDT base units, or NO-ASK-PRICE */
                                 askPriceInUSDT: string;
                                 askExpiresAt?: string;
-                                /** @description USD cents, or NO-FMV-PRICE */
-                                fmvPriceInUSD: string;
                                 fmvUpdatedAt?: string | null;
                                 /** Format: uri */
                                 frontImageUrl: string;
+                                /**
+                                 * @description The collectible's category.
+                                 * @enum {string}
+                                 */
+                                type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
                                 attributes: {
-                                    trait: string;
+                                    key: string;
                                     value: string;
                                 }[];
-                                gradingCompany: string;
-                                grade: string;
-                                year: number;
+                                /** @description USD cents, or NO-FMV-PRICE */
+                                fmvInUsd: string;
                                 owner: {
                                     username: string;
                                     /** Format: uri */
@@ -5024,8 +5087,6 @@ export interface paths {
                                 } | null;
                                 /** Format: uri */
                                 backImageUrl?: string;
-                                /** Format: uri */
-                                frontWithoutStandImageUrl?: string;
                             };
                             pricing: {
                                 top_offer: {
@@ -5059,7 +5120,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Card not found */
+                /** @description Collectible not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5093,14 +5154,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v2/marketplace/cards/{tokenId}/orders": {
+    "/v2/marketplace/collectibles/{tokenId}/orders": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get the active ask and funded bids for a visible card */
+        /** Get the active ask and funded bids for a visible collectible */
         get: {
             parameters: {
                 query?: never;
@@ -5153,7 +5214,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Card not found */
+                /** @description Collectible not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5187,14 +5248,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v2/redeem/cards": {
+    "/v2/redeem/collectibles": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List this EOA's eligible redemption cards */
+        /** List this EOA's eligible redemption collectibles */
         get: {
             parameters: {
                 query?: {
@@ -5218,12 +5279,12 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            cards: {
+                            collectibles: {
                                 tokenId: string;
                                 name: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                fmvPriceInUsd: string | null;
+                                fmvInUsd: string | null;
                                 /** Format: date-time */
                                 fmvUpdatedAt: string | null;
                                 /** Format: date-time */
@@ -5374,7 +5435,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Count this EOA's redeemable cards by region */
+        /** Count this EOA's redeemable collectibles by region */
         get: {
             parameters: {
                 query?: never;
@@ -5737,9 +5798,9 @@ export interface paths {
                 /**
                  * @description The cart was refused or the rates could not be fetched.
                  *
-                 *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form; a card is not ready for redemption; the cards are not in one region; a card has no declared value; or the destination is not supported or needs a state. Fix the request and send it again.
+                 *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form; a collectible is not ready for redemption; the collectibles are not in one region; a collectible has no declared value; or the destination is not supported or needs a state. Fix the request and send it again.
                  *     - `REDEEM_COURIER_RATES_FETCH_FAILED`: shipping rates could not be fetched for this cart and destination. Check the address, or try again later.
-                 *     - `REDEMPTION_VAULT_RESOLUTION_FAILED`: shipping could not be priced for these cards right now. Retry later.
+                 *     - `REDEMPTION_VAULT_RESOLUTION_FAILED`: shipping could not be priced for these collectibles right now. Retry later.
                  */
                 400: {
                     headers: {
@@ -5748,7 +5809,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "A card is not ready for redemption",
+                         *       "error": "A collectible is not ready for redemption",
                          *       "code": "WRONG_REQUEST_PARAMS"
                          *     }
                          */
@@ -5786,9 +5847,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description A card is not owned by this wallet.
+                 * @description A collectible is not owned by this wallet.
                  *
-                 *     - `WRONG_REQUEST_PARAMS`: a card in the cart is not owned by the wallet of the wallet access token. Send only cards the wallet owns.
+                 *     - `WRONG_REQUEST_PARAMS`: a collectible in the cart is not owned by the wallet of the wallet access token. Send only collectibles the wallet owns.
                  *     - `API_AUTH_INSUFFICIENT_SCOPE`: the wallet access token lacks the scope this route needs: `redeem:read` to read, `redeem:write` to change. Have the wallet sign in again and ask for the scope.
                  *     - `API_AUTH_INTEGRATION_MISMATCH`: the wallet access token was issued to another builder than the key. Use the key of the builder that issued the token.
                  *     - `API_AUTH_SUBJECT_MISMATCH`: the wallet access token is not for the chain of this API. Have the wallet sign in again for the right chain.
@@ -5802,7 +5863,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Every card must be owned by the authenticated EOA",
+                         *       "error": "Every collectible must be owned by the authenticated EOA",
                          *       "code": "WRONG_REQUEST_PARAMS"
                          *     }
                          */
@@ -5895,7 +5956,7 @@ export interface paths {
         put?: never;
         /**
          * Prepare an EOA Permit2 redemption from a saved quote
-         * @description Binds the exact card set, recipient, destination, courier, price and builder on the server. The user signs one Permit2 witness authorization. Never accept fee amounts from the client.
+         * @description Binds the exact collectible set, recipient, destination, courier, price and builder on the server. The user signs one Permit2 witness authorization. Never accept fee amounts from the client.
          */
         post: {
             parameters: {
@@ -6003,7 +6064,7 @@ export interface paths {
                 /**
                  * @description The request was refused before anything happened.
                  *
-                 *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form; a card is not ready for redemption; the cards are not in one region; a card has no declared value; or the destination is not supported or needs a state. Fix the request and send it again. It is also used when the quote has expired or the courier is not part of the quote: ask for a new quote.
+                 *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form; a collectible is not ready for redemption; the collectibles are not in one region; a collectible has no declared value; or the destination is not supported or needs a state. Fix the request and send it again. It is also used when the quote has expired or the courier is not part of the quote: ask for a new quote.
                  */
                 400: {
                     headers: {
@@ -6050,9 +6111,9 @@ export interface paths {
                     };
                 };
                 /**
-                 * @description A card is not owned by this wallet.
+                 * @description A collectible is not owned by this wallet.
                  *
-                 *     - `WRONG_REQUEST_PARAMS`: a card in the cart is not owned by the wallet of the wallet access token. Send only cards the wallet owns.
+                 *     - `WRONG_REQUEST_PARAMS`: a collectible in the cart is not owned by the wallet of the wallet access token. Send only collectibles the wallet owns.
                  *     - `API_AUTH_INSUFFICIENT_SCOPE`: the wallet access token lacks the scope this route needs: `redeem:read` to read, `redeem:write` to change. Have the wallet sign in again and ask for the scope.
                  *     - `API_AUTH_INTEGRATION_MISMATCH`: the wallet access token was issued to another builder than the key. Use the key of the builder that issued the token.
                  *     - `API_AUTH_SUBJECT_MISMATCH`: the wallet access token is not for the chain of this API. Have the wallet sign in again for the right chain.
@@ -6066,7 +6127,7 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "error": "Every card must be owned by the authenticated EOA",
+                         *       "error": "Every collectible must be owned by the authenticated EOA",
                          *       "code": "WRONG_REQUEST_PARAMS"
                          *     }
                          */
@@ -6219,8 +6280,8 @@ export interface paths {
                 /**
                  * @description The redemption cannot be submitted.
                  *
-                 *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form, or a card in the preparation can no longer be redeemed. Prepare again from a new quote.
-                 *     - `FUNCTION_ERROR`: the state of a card could not be read. Read `GET /v2/redeem/checkout/{preparationId}` before you try again.
+                 *     - `WRONG_REQUEST_PARAMS`: a field is missing or has the wrong form, or a collectible in the preparation can no longer be redeemed. Prepare again from a new quote.
+                 *     - `FUNCTION_ERROR`: the state of a collectible could not be read. Read `GET /v2/redeem/checkout/{preparationId}` before you try again.
                  *     - `REDEMPTION_ORDER_VALIDATION_FAILED`: the prepared redemption is no longer valid. Prepare again from a new quote.
                  *     - `INSUFFICIENT_USDT_AMOUNT`: the wallet does not hold enough USDT for the fee. Add funds, then prepare again.
                  *     - `CONTRACT_REVERT`: the redemption was rejected. Read `GET /v2/redeem/checkout/{preparationId}` before you try again.
@@ -6325,7 +6386,7 @@ export interface paths {
                 /**
                  * @description A checkout for this cart is already running.
                  *
-                 *     - `REDEMPTION_ORDER_CHECKOUT_STILL_ACTIVE`: a checkout for these cards is already in progress. Do not send it again. Read `GET /v2/redeem/checkout/{preparationId}` to follow it.
+                 *     - `REDEMPTION_ORDER_CHECKOUT_STILL_ACTIVE`: a checkout for these collectibles is already in progress. Do not send it again. Read `GET /v2/redeem/checkout/{preparationId}` to follow it.
                  */
                 409: {
                     headers: {
@@ -6661,12 +6722,12 @@ export interface paths {
                                 status: string;
                                 trackingNumber: string | null;
                                 shipmentStatus: string | null;
-                                cards: {
+                                collectibles: {
                                     tokenId: string;
                                     name: string;
                                     /** Format: uri */
                                     frontImageUrl: string;
-                                    fmvPriceInUsd: string | null;
+                                    fmvInUsd: string | null;
                                 }[];
                             }[];
                             hasMore: boolean;
@@ -6866,12 +6927,12 @@ export interface paths {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string | null;
-                            cards: {
+                            collectibles: {
                                 tokenId: string;
                                 name: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                fmvPriceInUsd: string | null;
+                                fmvInUsd: string | null;
                                 /** Format: date-time */
                                 fmvUpdatedAt: string | null;
                                 regionCountryCode: string;
@@ -7099,12 +7160,12 @@ export interface paths {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string | null;
-                            cards: {
+                            collectibles: {
                                 tokenId: string;
                                 name: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                fmvPriceInUsd: string | null;
+                                fmvInUsd: string | null;
                                 /** Format: date-time */
                                 fmvUpdatedAt: string | null;
                                 regionCountryCode: string;
@@ -7265,6 +7326,696 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/users/{walletAddress}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count a wallet's collectibles and total their market value
+         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. The count and the total are over exactly the collectibles GET /v2/users/{walletAddress}/collectibles lists for your builder key.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The wallet to read. Exactly this address. */
+                    walletAddress: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description How many collectibles GET /v2/users/{walletAddress}/collectibles lists for the wallet and your builder key. */
+                            collectibleCount: number;
+                            /** @description The sum of those collectibles' fmvInUsd, in USD cents. */
+                            totalFmvInUsd: string;
+                            /** @description How many of those collectibles have no market value and add nothing. */
+                            collectiblesWithoutFmv: number;
+                        };
+                    };
+                };
+                /**
+                 * @description The request was refused before anything happened.
+                 *
+                 *     - `WRONG_REQUEST_PARAMS`: a field is missing, unknown or has the wrong form. Fix the request and send it again. Served as `{ code, message }`.
+                 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "code": "WRONG_REQUEST_PARAMS",
+                         *       "message": "Bad request - invalid parameters"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @enum {string} */
+                            code: "WRONG_REQUEST_PARAMS";
+                            /** @description A short sentence about what went wrong. */
+                            message: string;
+                        };
+                    };
+                };
+                /**
+                 * @description The builder key is missing or not accepted.
+                 *
+                 *     - `API_AUTH_MISSING_CREDENTIAL`: no builder key was sent. Send your builder key in the `x-builder-api-key` header.
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Required authentication credential is missing",
+                         *       "code": "API_AUTH_MISSING_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_MISSING_CREDENTIAL" | "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The builder key is not allowed to make this request.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: this route takes a builder key only. Remove the `Authorization` header and any other credential, then send the request again.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
+                /**
+                 * @description Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication rate limit exceeded",
+                         *       "code": "API_AUTH_RATE_LIMITED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
+                        };
+                    };
+                };
+                /** @description A failure on our side. Retry later. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Internal server error",
+                         *       "code": "FUNCTION_ERROR"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            code: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/users/{walletAddress}/collectibles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the collectibles a wallet has
+         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. A collectible is listed while the wallet owns it on chain, however it got it. A collectible the wallet pulled with your builder key is also listed while Renaiss still holds it (its buyback window, then until delivery); a collectible it pulled with another builder or on renaiss.xyz appears once it is delivered on chain. If a contract wallet never accepts delivery, the collectible leaves the list and the totals, with no delivery-failure activity and no refund. A collectible that was sold, sold back, transferred away or redeemed is not listed. Sorting and paging apply to the whole list.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description pulledAt: when the wallet pulled the collectible with your builder key. fmvInUsd: its market value. buybackExpiresAt: when its current buyback price tier ends; a later tier can remain available. A collectible without the value sorts last in both directions. */
+                    sortBy?: "pulledAt" | "fmvInUsd" | "buybackExpiresAt";
+                    sortOrder?: "asc" | "desc";
+                    limit?: number;
+                    offset?: number | null;
+                };
+                header?: never;
+                path: {
+                    /** @description The wallet to read. Exactly this address. */
+                    walletAddress: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            collectibles: {
+                                /** @description The collectible's token id. */
+                                tokenId: string;
+                                /**
+                                 * @description The collectible's category.
+                                 * @enum {string}
+                                 */
+                                type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                /** @description Grade, year, set, number and title. */
+                                name: string;
+                                /**
+                                 * Format: uri
+                                 * @description The graded slab in its Renaiss frame, on a dark background.
+                                 */
+                                frontImageUrl: string;
+                                /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market. Null for a collectible that has none yet. */
+                                fmvInUsd: string | null;
+                                /**
+                                 * Format: date-time
+                                 * @description When fmvInUsd was last updated. Null without one.
+                                 */
+                                fmvUpdatedAt: string | null;
+                                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                                attributes: {
+                                    key: string;
+                                    value: string;
+                                }[];
+                                /** @description IN_WALLET: the wallet owns the collectible on chain. IN_BUYBACK_WINDOW: the wallet pulled the collectible with your builder key, Renaiss holds it and the wallet can still sell it back; sign the offer from GET /v2/gacha/buyback/offers. AWAITING_DELIVERY: the wallet pulled the collectible with your builder key, no buyback is offered and the collectible is not in the wallet yet. */
+                                state: {
+                                    /** @enum {string} */
+                                    status: "IN_WALLET";
+                                } | {
+                                    /** @enum {string} */
+                                    status: "IN_BUYBACK_WINDOW";
+                                    /** @description The price of the current buyback tier, in 18-decimal USDT units. */
+                                    buybackAmountInUsdt: string;
+                                    /**
+                                     * Format: date-time
+                                     * @description When the current price tier ends, not necessarily the final buyback or release deadline.
+                                     */
+                                    buybackExpiresAt: string;
+                                } | {
+                                    /** @enum {string} */
+                                    status: "AWAITING_DELIVERY";
+                                };
+                                /** @description The wallet's pull of this collectible with your builder key. Null for a collectible it got any other way: another builder, renaiss.xyz, a purchase or a transfer. */
+                                pull: {
+                                    /**
+                                     * Format: uuid
+                                     * @description The pack the collectible was pulled from.
+                                     */
+                                    packId: string;
+                                    packName: string;
+                                    /** @description The payment of the pull. */
+                                    permitFundTxHash: string;
+                                    /**
+                                     * Format: date-time
+                                     * @description The block time of that payment.
+                                     */
+                                    pulledAt: string;
+                                } | null;
+                            }[];
+                            pagination: {
+                                total: number;
+                                limit: number;
+                                offset: number;
+                                hasMore: boolean;
+                            };
+                        };
+                    };
+                };
+                /**
+                 * @description The request was refused before anything happened.
+                 *
+                 *     - `WRONG_REQUEST_PARAMS`: a field is missing, unknown or has the wrong form. Fix the request and send it again. Served as `{ code, message }`.
+                 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "code": "WRONG_REQUEST_PARAMS",
+                         *       "message": "Bad request - invalid parameters"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @enum {string} */
+                            code: "WRONG_REQUEST_PARAMS";
+                            /** @description A short sentence about what went wrong. */
+                            message: string;
+                        };
+                    };
+                };
+                /**
+                 * @description The builder key is missing or not accepted.
+                 *
+                 *     - `API_AUTH_MISSING_CREDENTIAL`: no builder key was sent. Send your builder key in the `x-builder-api-key` header.
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Required authentication credential is missing",
+                         *       "code": "API_AUTH_MISSING_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_MISSING_CREDENTIAL" | "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The builder key is not allowed to make this request.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: this route takes a builder key only. Remove the `Authorization` header and any other credential, then send the request again.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
+                /**
+                 * @description Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication rate limit exceeded",
+                         *       "code": "API_AUTH_RATE_LIMITED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
+                        };
+                    };
+                };
+                /** @description A failure on our side. Retry later. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Internal server error",
+                         *       "code": "FUNCTION_ERROR"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            code: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/users/{walletAddress}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what a wallet did with collectibles on chain
+         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. Newest first: gacha pulls, buybacks and deliveries with any builder, marketplace buys and sells, transfers, mints and redemptions (burn). Each entry is a chain event. A pull names its pack by its on-chain id (`onChainPackId` in GET /v2/gacha/packs) and never its collectibles; a buyback names its settlement ids (`settlementId` in your GET /v2/gacha/pull-history) and its total, never its collectibles. Page with `cursor`: send the `nextCursor` of the page before; null means the end, and a page that is empty but has a cursor is not the end. Paging is by chain event, so a transaction with several events can continue on the next page.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only this kind of activity. Every kind when `all`. */
+                    filter?: "all" | "gacha-v3-pull" | "gacha-v3-buyback" | "gacha-v3-release-token" | "buy" | "sell" | "transfer" | "mint" | "burn";
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description The wallet to read. Exactly this address. */
+                    walletAddress: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            activities: ({
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                /** @enum {string} */
+                                type: "gacha-v3-pull";
+                                contractAddress: string;
+                                packId: string;
+                                token: string;
+                                checkoutIds: string[];
+                                totalAmount: string;
+                                blockHash: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                /** @enum {string} */
+                                type: "gacha-v3-buyback";
+                                contractAddress: string;
+                                buybackIds: string[];
+                                token: string;
+                                priceInUsdt: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                item?: {
+                                    tokenId: string;
+                                    imageUrl: string;
+                                    title: string;
+                                    subtitle: string;
+                                };
+                                /** @enum {string} */
+                                type: "gacha-v3-release-token";
+                                contractAddress: string;
+                                releaseTokenId: string;
+                                nftTokenId: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                item?: {
+                                    tokenId: string;
+                                    imageUrl: string;
+                                    title: string;
+                                    subtitle: string;
+                                };
+                                /** @enum {string} */
+                                type: "buy";
+                                bidder: string;
+                                asker: string;
+                                nftTokenId: string;
+                                erc20Token: string;
+                                amount: string;
+                                feeAccrued: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                item?: {
+                                    tokenId: string;
+                                    imageUrl: string;
+                                    title: string;
+                                    subtitle: string;
+                                };
+                                /** @enum {string} */
+                                type: "sell";
+                                bidder: string;
+                                asker: string;
+                                nftTokenId: string;
+                                erc20Token: string;
+                                amount: string;
+                                feeAccrued: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                item?: {
+                                    tokenId: string;
+                                    imageUrl: string;
+                                    title: string;
+                                    subtitle: string;
+                                };
+                                /** @enum {string} */
+                                type: "transfer";
+                                to: string;
+                                tokenId: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                item?: {
+                                    tokenId: string;
+                                    imageUrl: string;
+                                    title: string;
+                                    subtitle: string;
+                                };
+                                /** @enum {string} */
+                                type: "mint";
+                                tokenAmount: string;
+                                tokenId: string;
+                            } | {
+                                user: string;
+                                timestamp: string;
+                                blockNumber: string;
+                                txHash: string;
+                                item?: {
+                                    tokenId: string;
+                                    imageUrl: string;
+                                    title: string;
+                                    subtitle: string;
+                                };
+                                /** @enum {string} */
+                                type: "burn";
+                                tokenAmount: string;
+                                tokenId: string;
+                            })[];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+                /**
+                 * @description The request was refused before anything happened.
+                 *
+                 *     - `WRONG_REQUEST_PARAMS`: a field is missing, unknown or has the wrong form. Fix the request and send it again. Served as `{ code, message }`.
+                 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "code": "WRONG_REQUEST_PARAMS",
+                         *       "message": "Bad request - invalid parameters"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @enum {string} */
+                            code: "WRONG_REQUEST_PARAMS";
+                            /** @description A short sentence about what went wrong. */
+                            message: string;
+                        };
+                    };
+                };
+                /**
+                 * @description The builder key is missing or not accepted.
+                 *
+                 *     - `API_AUTH_MISSING_CREDENTIAL`: no builder key was sent. Send your builder key in the `x-builder-api-key` header.
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Required authentication credential is missing",
+                         *       "code": "API_AUTH_MISSING_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_MISSING_CREDENTIAL" | "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The builder key is not allowed to make this request.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: this route takes a builder key only. Remove the `Authorization` header and any other credential, then send the request again.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
+                /**
+                 * @description Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication rate limit exceeded",
+                         *       "code": "API_AUTH_RATE_LIMITED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
+                        };
+                    };
+                };
+                /** @description A failure on our side. Retry later. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Internal server error",
+                         *       "code": "FUNCTION_ERROR"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            code: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7282,7 +8033,7 @@ export interface components {
                 packId: string;
                 /** @description The nonce of the signed pull. */
                 nonce: string;
-                /** @description How many cards the pull buys: 1, 5 or 10. */
+                /** @description How many collectibles the pull buys: 1 to 10. */
                 numOfTokens: number;
                 /** @description A short sentence for display. */
                 message: string;
@@ -7300,7 +8051,7 @@ export interface components {
                 packId: string;
                 /** @description The nonce of the signed pull. */
                 nonce: string;
-                /** @description How many cards the pull buys: 1, 5 or 10. */
+                /** @description How many collectibles the pull buys: 1 to 10. */
                 numOfTokens: number;
                 /** @description A short sentence for display. */
                 message: string;
@@ -7318,7 +8069,7 @@ export interface components {
                 packId: string;
                 /** @description The nonce of the signed pull. */
                 nonce: string;
-                /** @description How many cards the pull buys: 1, 5 or 10. */
+                /** @description How many collectibles the pull buys: 1 to 10. */
                 numOfTokens: number;
                 /** @description A short sentence for display. */
                 message: string;
@@ -7336,7 +8087,7 @@ export interface components {
                 packId: string;
                 /** @description The nonce of the signed pull. */
                 nonce: string;
-                /** @description How many cards the pull buys: 1, 5 or 10. */
+                /** @description How many collectibles the pull buys: 1 to 10. */
                 numOfTokens: number;
                 /** @description A short sentence for display. */
                 message: string;
@@ -7366,15 +8117,35 @@ export interface components {
                     tokenId: string;
                     releaseTxHash: string | null;
                     buybackTxHash: string | null;
+                    /** @description The collectible's tier for this draw. */
+                    tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
+                    /** @description The collectible's base buyback value in USD cents. */
+                    buybackBaseValueInUSD: string;
                     collectible: {
+                        /**
+                         * @description The collectible's category.
+                         * @enum {string}
+                         */
+                        type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                        /** @description Grade, year, set, number and title. */
                         name: string;
-                        /** Format: uri */
+                        /**
+                         * Format: uri
+                         * @description The graded slab in its Renaiss frame, on a dark background.
+                         */
                         frontImageUrl: string;
-                        /** Format: uri */
-                        imageUrl: string;
-                        tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
-                        buybackBaseValueInUSD: string;
-                        snapshotBuybackValueInUsdt: string | null;
+                        /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market and is not the buyback value. Null for a collectible that has none yet. */
+                        fmvInUsd: string | null;
+                        /**
+                         * Format: date-time
+                         * @description When fmvInUsd was last updated. Null without one.
+                         */
+                        fmvUpdatedAt: string | null;
+                        /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                        attributes: {
+                            key: string;
+                            value: string;
+                        }[];
                     };
                 }[];
             };
@@ -7391,7 +8162,7 @@ export interface components {
                 packId: string;
                 /** @description The nonce of the signed pull. */
                 nonce: string;
-                /** @description How many cards the pull buys: 1, 5 or 10. */
+                /** @description How many collectibles the pull buys: 1 to 10. */
                 numOfTokens: number;
                 /** @description A short sentence for display. */
                 message: string;
@@ -7415,7 +8186,7 @@ export interface components {
             packId: string;
             /** @description The nonce of the signed pull. */
             nonce: string;
-            /** @description How many cards the pull buys: 1, 5 or 10. */
+            /** @description How many collectibles the pull buys: 1 to 10. */
             numOfTokens: number;
             /** @description A short sentence for display. */
             message: string;
@@ -7430,7 +8201,7 @@ export interface components {
             packId: string;
             /** @description The nonce of the signed pull. */
             nonce: string;
-            /** @description How many cards the pull buys: 1, 5 or 10. */
+            /** @description How many collectibles the pull buys: 1 to 10. */
             numOfTokens: number;
             /** @description A short sentence for display. */
             message: string;
@@ -7457,15 +8228,35 @@ export interface components {
                 tokenId: string;
                 releaseTxHash: string | null;
                 buybackTxHash: string | null;
+                /** @description The collectible's tier for this draw. */
+                tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
+                /** @description The collectible's base buyback value in USD cents. */
+                buybackBaseValueInUSD: string;
                 collectible: {
+                    /**
+                     * @description The collectible's category.
+                     * @enum {string}
+                     */
+                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                    /** @description Grade, year, set, number and title. */
                     name: string;
-                    /** Format: uri */
+                    /**
+                     * Format: uri
+                     * @description The graded slab in its Renaiss frame, on a dark background.
+                     */
                     frontImageUrl: string;
-                    /** Format: uri */
-                    imageUrl: string;
-                    tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
-                    buybackBaseValueInUSD: string;
-                    snapshotBuybackValueInUsdt: string | null;
+                    /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market and is not the buyback value. Null for a collectible that has none yet. */
+                    fmvInUsd: string | null;
+                    /**
+                     * Format: date-time
+                     * @description When fmvInUsd was last updated. Null without one.
+                     */
+                    fmvUpdatedAt: string | null;
+                    /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                    attributes: {
+                        key: string;
+                        value: string;
+                    }[];
                 };
             }[];
         };
@@ -7479,7 +8270,7 @@ export interface components {
             packId: string;
             /** @description The nonce of the signed pull. */
             nonce: string;
-            /** @description How many cards the pull buys: 1, 5 or 10. */
+            /** @description How many collectibles the pull buys: 1 to 10. */
             numOfTokens: number;
             /** @description A short sentence for display. */
             message: string;

@@ -15,6 +15,7 @@ import {
   bytes32Schema,
   type EoaBuybackOffer,
   EoaBuybackOfferSchema,
+  type EoaBuybackTier,
   EoaContentsResponseSchema,
   EoaHistoryResponseSchema,
   EoaMachineResponseSchema,
@@ -197,8 +198,8 @@ export function listEoaContents(
         EoaContentsResponseSchema,
       )();
       if (isFailed(result)) return result;
-      const { cards, pagination } = getValue(result);
-      return Success({ items: cards, ...pagination });
+      const { collectibles, pagination } = getValue(result);
+      return Success({ items: collectibles, ...pagination });
     },
   );
 }
@@ -672,13 +673,36 @@ export function submitEoaPull(
   };
 }
 
+/**
+ * The buyback tier that prices `offer` at `at` (default: now): the tier with
+ * the soonest `expiresAt` that has not passed, since a tier still applies at
+ * its `expiresAt`. On a same-end tie the lower amount applies. Returns
+ * `undefined` once every tier has ended. A tier with an `amountInUsdt` of 0 is
+ * a hold: the offer cannot be sold back until a later tier starts.
+ */
+export function currentBuybackTier(
+  offer: EoaBuybackOffer,
+  at: Date = new Date(),
+): EoaBuybackTier | undefined {
+  const now = at.getTime();
+  return [...offer.buybackTiers]
+    .sort((a, b) => {
+      const byEnd = Date.parse(a.expiresAt) - Date.parse(b.expiresAt);
+      if (byEnd !== 0) return byEnd;
+      const x = BigInt(a.amountInUsdt);
+      const y = BigInt(b.amountInUsdt);
+      return x < y ? -1 : x > y ? 1 : 0;
+    })
+    .find((tier) => Date.parse(tier.expiresAt) >= now);
+}
+
 const buybackRequest = walletRequest.extend({
   chainId: z.number().int().positive(),
   token: addressSchema,
   offers: z.array(EoaBuybackOfferSchema).min(1).max(10),
 });
 export type EoaCreateBuybackRequest = z.input<typeof buybackRequest>;
-/** Signs compatible unexpired offers with an exact bigint sum. Result codes: WRONG_REQUEST_PARAMS, GACHA_SIGNING_FAILED. No NFT approval is required. */
+/** Signs compatible offers for the exact bigint sum of each offer's current tier price. Result codes: WRONG_REQUEST_PARAMS, GACHA_SIGNING_FAILED. No NFT approval is required. */
 export function createEoaBuyback(
   ctx: EoaContext,
   request: EoaCreateBuybackRequest,
@@ -690,6 +714,12 @@ export function createEoaBuyback(
       if (!ctx.signer) return invalid('A signer is required');
       const { offers, buyerWalletAddress, chainId, token } = parsed.data;
       const first = offers[0];
+      // Priced once, at signing time: a tier that ends before the API receives
+      // the buyback makes it fail with GACHA_V3_BUYBACK_PRICE_CHANGED.
+      const signedAt = new Date();
+      const prices = offers.map(
+        (offer) => currentBuybackTier(offer, signedAt)?.amountInUsdt,
+      );
       if (
         !first ||
         chainId !== ctx.network.chainId ||
@@ -707,16 +737,15 @@ export function createEoaBuyback(
           (o) =>
             o.cardPackId !== first.cardPackId ||
             o.vendingMachineAddress.toLowerCase() !==
-              first.vendingMachineAddress.toLowerCase() ||
-            Date.parse(o.expiresAt) <= Date.now() ||
-            BigInt(o.amountInUsdt) <= 0n,
-        )
+              first.vendingMachineAddress.toLowerCase(),
+        ) ||
+        prices.some((price) => price === undefined || BigInt(price) <= 0n)
       )
         return invalid(
-          'Offers must be unique, unexpired, positive, from one pack and contract, and signed by the buyer on the expected chain',
+          'Offers must be unique, priced above zero now, from one pack and contract, and signed by the buyer on the expected chain',
         );
-      const amount = offers.reduce(
-        (sum, offer) => sum + BigInt(offer.amountInUsdt),
+      const amount = prices.reduce(
+        (sum, price) => sum + BigInt(price ?? 0),
         0n,
       );
       const buybackIds = offers.map((offer) => offer.settlementId);

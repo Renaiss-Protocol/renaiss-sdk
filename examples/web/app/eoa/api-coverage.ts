@@ -42,11 +42,6 @@ const machineFields: FieldUse[] = [
     use: "Not displayed; list cards show the detail's activeSetExpectedValueInUsd",
   },
   {
-    field: 'featuredCardFmvInUsd',
-    status: 'shown',
-    use: 'List card "Featured card value". null for v3 machines; the demo then shows the highest tier maximum, labelled "Catalog max"',
-  },
-  {
     field: 'onChainPackId',
     status: 'sdk',
     use: 'Permit witness consistency check',
@@ -123,14 +118,14 @@ export const coverage: EndpointCoverage[] = [
         use: 'Detail and list "Set EV" chip (mean value of the whole set, drawn cards included)',
       },
       {
-        field: 'cardPack.buybackPercentage',
+        field: 'cardPack.buybackConfig[].buybackPercentage',
         status: 'shown',
-        use: '"Instant buyback" percentage cell',
+        use: '"Instant buyback" cell: the highest tier percentage ("None" when buybackConfig is empty)',
       },
       {
-        field: 'cardPack.buybackWindowSeconds',
+        field: 'cardPack.buybackConfig[].buybackExpiredInSeconds',
         status: 'shown',
-        use: 'Pull-history hint ("after their buyback offer period"); offer expiry window',
+        use: 'Buyback window = the largest value: pull-history hint ("after their buyback offer period"); "Offer not listed yet (window …)"',
       },
     ],
   },
@@ -140,22 +135,22 @@ export const coverage: EndpointCoverage[] = [
     sdk: 'listGachaMachineContents()',
     fields: [
       {
-        field: 'cards[].name',
+        field: 'collectibles[].name',
         status: 'shown',
         use: 'Showcase caption; tile title',
       },
       {
-        field: 'cards[].tier',
+        field: 'collectibles[].tier',
         status: 'derived',
         use: 'Tier filter, applied in the browser over every loaded page',
       },
       {
-        field: 'cards[].buybackBaseValueInUsd',
+        field: 'collectibles[].buybackBaseValueInUsd',
         status: 'shown',
         use: '"Buyback base value $X" pill; sort key',
       },
       {
-        field: 'cards[].frontImageUrl',
+        field: 'collectibles[].frontImageUrl',
         status: 'shown',
         use: 'Slab render in the grid',
       },
@@ -324,35 +319,44 @@ export const coverage: EndpointCoverage[] = [
         use: 'History "Sold ↗" (null at reveal time)',
       },
       {
+        field: 'draws_resolved.data.draws[].tier',
+        status: 'shown',
+        use: '"You got a C-tier card!"',
+      },
+      {
+        field: 'draws_resolved.data.draws[].buybackBaseValueInUSD',
+        status: 'shown',
+        use: '"Buyback base value $X"',
+      },
+      {
+        field: 'draws_resolved.data.draws[].collectible.type',
+        status: 'unused',
+        use: 'Not displayed',
+      },
+      {
         field: 'draws_resolved.data.draws[].collectible.name',
         status: 'shown',
         use: 'Reveal card name',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.tier',
-        status: 'shown',
-        use: '"You got a C-tier card!"',
-      },
-      {
-        field: 'draws_resolved.data.draws[].collectible.imageUrl',
-        status: 'unused',
-        use: 'Not displayed; the reveal uses frontImageUrl',
-      },
-      {
-        field: 'draws_resolved.data.draws[].collectible.buybackBaseValueInUSD',
-        status: 'shown',
-        use: '"Buyback base value $X"; instant buyback %',
-      },
-      {
-        field:
-          'draws_resolved.data.draws[].collectible.snapshotBuybackValueInUsdt',
-        status: 'shown',
-        use: '"Instant price $X" before the offer is available',
-      },
-      {
         field: 'draws_resolved.data.draws[].collectible.frontImageUrl',
         status: 'shown',
         use: 'Reveal image: graded PSA slab, including its label',
+      },
+      {
+        field: 'draws_resolved.data.draws[].collectible.fmvInUsd',
+        status: 'unused',
+        use: 'Not displayed; the reveal prices the card by its buyback offer',
+      },
+      {
+        field: 'draws_resolved.data.draws[].collectible.fmvUpdatedAt',
+        status: 'unused',
+        use: 'Not displayed',
+      },
+      {
+        field: 'draws_resolved.data.draws[].collectible.attributes[]',
+        status: 'unused',
+        use: 'Not displayed; the name already carries the card details',
       },
       {
         field:
@@ -450,14 +454,19 @@ export const coverage: EndpointCoverage[] = [
         use: 'Matches a reveal / history row',
       },
       {
-        field: 'offers[].amountInUsdt',
+        field: 'offers[].buybackTiers[].amountInUsdt',
         status: 'shown',
-        use: '"Accept for $X"; signed amount',
+        use: 'Current tier (currentBuybackTier) price: "Accept for $X", "Sell all" total; the SDK signs it. 0 is a hold: selling is disabled',
       },
       {
-        field: 'offers[].expiresAt',
+        field: 'offers[].buybackTiers[].expiresAt',
         status: 'shown',
-        use: '"Offer expires in MM:SS"',
+        use: 'Picks the current tier; "N% price ends in MM:SS", "On hold, sellable in MM:SS", or "Offer expires in MM:SS" at the last positive tier',
+      },
+      {
+        field: 'offers[].buybackTiers[].buybackPercentage',
+        status: 'shown',
+        use: 'Reveal "N% Instant buyback" label for the current tier',
       },
       {
         field: 'offers[].vendingMachineAddress',
