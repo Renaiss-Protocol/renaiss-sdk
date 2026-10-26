@@ -122,22 +122,18 @@ export const EoaPullSchema = z.object({
   pulledAt: z.string().datetime().nullable(),
   draws: z.array(EoaDrawSchema),
 });
-const EoaResolvedPullSchema = EoaPullSchema.extend({
-  status: z.literal('RESOLVED'),
+/** A resolved pull from the stream: no status, and each draw names its collectible. */
+const EoaResolvedPullSchema = EoaPullSchema.omit({ status: true }).extend({
   draws: z.array(
     EoaDrawSchema.extend({
       tier: z.string(),
       buybackBaseValueInUSD: numericStringSchema,
-      collectible: z.object({
-        // A plain string: the API adds collectible types (POKEMON, ONE_PIECE,
-        // SPORTS today) without a new SDK release.
-        type: z.string(),
-        name: z.string(),
-        frontImageUrl: z.string().url(),
-        fmvInUsd: numericStringSchema.nullable(),
-        fmvUpdatedAt: z.string().datetime().nullable(),
-        attributes: z.array(CollectibleAttributeSchema),
-      }),
+      // A plain string: the API adds collectible types (POKEMON, ONE_PIECE,
+      // SPORTS today) without a new SDK release.
+      type: z.string(),
+      name: z.string(),
+      frontImageUrl: z.string().url(),
+      attributes: z.array(CollectibleAttributeSchema),
     }),
   ),
 });

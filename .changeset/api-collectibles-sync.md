@@ -2,12 +2,12 @@
 '@renaiss-protocol/client': minor
 ---
 
-Follow the v2 API's move from "cards" to "collectibles", its FMV rename and its tiered buybacks. Earlier releases now fail against the API: redeemable cards return 404, and pack, card detail, pull reveal and buyback offer responses fail with `INVALID_SCHEMA`. These changes are breaking.
+Follow the v2 API's move from "cards" to "collectibles", its rename of FMV to RIX price, and its tiered buybacks. Earlier releases now fail against the API: redeemable cards return 404 or 400, and pack, marketplace card, pull reveal and buyback offer responses fail with `INVALID_SCHEMA`. These changes are breaking.
 
 **Renamed fields**
 
-- `fmvPriceInUsd` is now `fmvInUsd` on marketplace cards, card details, redeemable cards and redemption orders.
-- `MarketplaceV2Sort.FmvPrice` is now `MarketplaceV2Sort.Fmv`, which sends `sortBy=fmvInUsd`.
+- `fmvPriceInUsd` is now `rixPriceInUsd`, and `fmvUpdatedAt` is now `rixPriceUpdatedAt`, on marketplace cards, card details, redeemable cards and redemption orders.
+- `MarketplaceV2Sort.FmvPrice` is now `MarketplaceV2Sort.RixPrice`, and `RedemptionCardSort.Fmv` is now `RedemptionCardSort.RixPrice`. Both send `sortBy=rixPriceInUsd`.
 - Redemption orders and order summaries list their items in `collectibles` instead of `cards`.
 
 **Marketplace card details**
@@ -20,7 +20,7 @@ Follow the v2 API's move from "cards" to "collectibles", its FMV rename and its 
 
 - `EoaMachine.featuredCardFmvInUsd` is removed.
 - `EoaMachineDetail.buybackPercentage` and `buybackWindowSeconds` are replaced by `buybackConfig`, a list of `{ buybackPercentage, buybackExpiredInSeconds }` tiers. The headline percentage is the highest `buybackPercentage`. The buyback window is the largest `buybackExpiredInSeconds`.
-- In a pull reveal (`submitGachaPull`), each draw now carries `tier` and `buybackBaseValueInUSD`. Its `collectible` is `{ type, name, frontImageUrl, fmvInUsd, fmvUpdatedAt, attributes }`. `imageUrl` and `snapshotBuybackValueInUsdt` are removed.
+- In a pull reveal (`submitGachaPull`), each draw carries its collectible directly: `tier`, `buybackBaseValueInUSD`, `type`, `name`, `frontImageUrl` and `attributes`. The nested `collectible` object, `imageUrl`, `snapshotBuybackValueInUsdt` and the pull's `status` are removed.
 
 **Tiered buybacks**
 

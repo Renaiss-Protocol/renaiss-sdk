@@ -479,8 +479,8 @@ function CheckoutForm() {
                     <span className={styles.itemName}>{card.name}</span>
                     <div className={styles.rowLine}>
                       <FmvBadge
-                        cents={card.fmvInUsd}
-                        updatedAt={card.fmvUpdatedAt}
+                        cents={card.rixPriceInUsd}
+                        updatedAt={card.rixPriceUpdatedAt}
                       />
                       <span className={`${styles.small} ${styles.muted}`}>
                         {card.regionCountryCode}
@@ -1199,8 +1199,8 @@ function Confirmation({ outcome }: { outcome: Outcome }) {
                 <div className={styles.summaryItemBody}>
                   <span className={styles.itemName}>{card.name}</span>
                   <FmvBadge
-                    cents={card.fmvInUsd}
-                    updatedAt={card.fmvUpdatedAt}
+                    cents={card.rixPriceInUsd}
+                    updatedAt={card.rixPriceUpdatedAt}
                   />
                 </div>
               </div>

@@ -51,12 +51,12 @@ function cardFields(prefix: string, withAcquired: boolean): FieldUse[] {
       use: 'Slab image on tiles, table, cart, summary',
     },
     {
-      field: `${prefix}.fmvInUsd`,
+      field: `${prefix}.rixPriceInUsd`,
       status: 'shown',
       use: 'FMV pill; Total FMV box (summed)',
     },
     {
-      field: `${prefix}.fmvUpdatedAt`,
+      field: `${prefix}.rixPriceUpdatedAt`,
       status: 'shown',
       use: 'FMV pill hover "Priced … ago" freshness',
     },
@@ -408,7 +408,7 @@ export const coverage: EndpointCoverage[] = [
         use: 'Image grid (first 3 + "+N")',
       },
       {
-        field: 'orders[].collectibles[].fmvInUsd',
+        field: 'orders[].collectibles[].rixPriceInUsd',
         status: 'shown',
         use: 'Summed FMV pill ("N/A" when none)',
       },

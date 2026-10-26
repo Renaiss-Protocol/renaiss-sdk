@@ -20,5 +20,5 @@ source document before regenerating.
 Current generation source:
 
 - `api/v2.generated.ts` and `api/error-codes.generated.ts`:
-  `https://dev-api.renaiss.xyz/v2/openapi.json` on 2026-10-16, SHA-256
-  `9d814e8240e680b3e135d466529c63f44c8570fc62fc3e1171640824c742dc6d`.
+  `https://dev-api.renaiss.xyz/v2/openapi.json` on 2026-10-26, SHA-256
+  `2bfc267c30c04b59228daf05acc1976170280742a76143ba596dac318c6d51ba`.

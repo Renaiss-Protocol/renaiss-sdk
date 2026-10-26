@@ -475,7 +475,7 @@ const idsSchema = z
   .max(50)
   .refine((ids) => new Set(ids).size === ids.length);
 export enum RedemptionCardSort {
-  Fmv = 'fmv',
+  RixPrice = 'rixPriceInUsd',
   CreatedAt = 'createdAt',
 }
 export enum RedemptionSortOrder {

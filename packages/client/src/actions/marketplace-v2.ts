@@ -65,7 +65,7 @@ export enum MarketplaceV2Sort {
   Year = 'year',
   Price = 'priceRange',
   AskPrice = 'askPriceInUSDT',
-  Fmv = 'fmvInUsd',
+  RixPrice = 'rixPriceInUsd',
 }
 export enum MarketplaceLanguage {
   English = 'English',

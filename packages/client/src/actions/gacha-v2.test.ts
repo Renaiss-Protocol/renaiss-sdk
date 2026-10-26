@@ -108,7 +108,6 @@ const resolved = {
   ...context,
   permitFundTxHash: hash,
   packName: 'Test',
-  status: 'RESOLVED',
   pulledAt: new Date().toISOString(),
   draws: [
     {
@@ -116,16 +115,14 @@ const resolved = {
       tokenId: '9007199254740993000',
       releaseTxHash: null,
       buybackTxHash: null,
+      buybackTiers: [],
       tier: 'S',
       buybackBaseValueInUSD: '1000',
-      collectible: {
-        type: 'POKEMON',
-        name: 'Pokémon',
-        frontImageUrl: 'https://test.example/front.png',
-        fmvInUsd: '1200',
-        fmvUpdatedAt: new Date().toISOString(),
-        attributes: [{ key: 'Set', value: 'Set' }],
-      },
+      buybackBonus: null,
+      type: 'POKEMON',
+      name: 'Pokémon',
+      frontImageUrl: 'https://test.example/front.png',
+      attributes: [{ key: 'Set', value: 'Set' }],
     },
   ],
 };
@@ -511,7 +508,7 @@ describe('v2 EOA signing and stream boundaries', () => {
       }),
     );
     expect(events).toEqual(['payment_confirmed', 'draws_resolved']);
-    expect(result.draws[0]?.collectible.name).toBe('Pokémon');
+    expect(result.draws[0]?.name).toBe('Pokémon');
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledOnce();
   });
@@ -727,7 +724,9 @@ describe('v2 EOA signing and stream boundaries', () => {
         urls.push(url);
         const offset = Number(url.searchParams.get('offset'));
         return Response.json({
-          pulls: [{ ...resolved, packName: `Page ${offset}` }],
+          pulls: [
+            { ...resolved, status: 'RESOLVED', packName: `Page ${offset}` },
+          ],
           limit: 1,
           offset,
           hasMore: offset === 0,

@@ -10,7 +10,7 @@ import {
 import { addressSchema, numericStringSchema } from './wallet';
 
 const wireAskPrice = z.union([numericStringSchema, z.literal('NO-ASK-PRICE')]);
-const wireFmv = z.union([numericStringSchema, z.literal('NO-FMV-PRICE')]);
+const wireRixPrice = z.union([numericStringSchema, z.literal('NO-RIX-PRICE')]);
 /** V2 tiles include their display image. USD is cents; USDT is 18-decimal base units. */
 const MarketplaceCardV2Schema = z
   .object({
@@ -18,16 +18,18 @@ const MarketplaceCardV2Schema = z
     name: z.string(),
     ownerAddress: addressSchema,
     askPriceInUSDT: wireAskPrice,
-    fmvInUsd: wireFmv,
-    fmvUpdatedAt: z.string().nullish(),
+    rixPriceInUsd: wireRixPrice,
+    rixPriceUpdatedAt: z.string().nullish(),
     frontImageUrl: z.string(),
   })
-  .transform(({ askPriceInUSDT, fmvInUsd, fmvUpdatedAt, ...card }) => ({
-    ...card,
-    askPriceInUsdt: askPriceInUSDT === 'NO-ASK-PRICE' ? null : askPriceInUSDT,
-    fmvInUsd: fmvInUsd === 'NO-FMV-PRICE' ? null : fmvInUsd,
-    fmvUpdatedAt: fmvUpdatedAt ?? null,
-  }));
+  .transform(
+    ({ askPriceInUSDT, rixPriceInUsd, rixPriceUpdatedAt, ...card }) => ({
+      ...card,
+      askPriceInUsdt: askPriceInUSDT === 'NO-ASK-PRICE' ? null : askPriceInUSDT,
+      rixPriceInUsd: rixPriceInUsd === 'NO-RIX-PRICE' ? null : rixPriceInUsd,
+      rixPriceUpdatedAt: rixPriceUpdatedAt ?? null,
+    }),
+  );
 export type MarketplaceCardV2 = z.infer<typeof MarketplaceCardV2Schema>;
 export const MarketplaceCardsV2ResponseSchema = z.object({
   collection: z.array(MarketplaceCardV2Schema),
@@ -41,8 +43,8 @@ export const CardDetailV2Schema = z
       ownerAddress: addressSchema,
       askPriceInUSDT: wireAskPrice,
       askExpiresAt: z.string().nullish(),
-      fmvInUsd: wireFmv,
-      fmvUpdatedAt: z.string().nullish(),
+      rixPriceInUsd: wireRixPrice,
+      rixPriceUpdatedAt: z.string().nullish(),
       frontImageUrl: z.string(),
       backImageUrl: z.string().nullish(),
       // A plain string: the API adds collectible types (POKEMON, ONE_PIECE,
@@ -65,8 +67,8 @@ export const CardDetailV2Schema = z
     const {
       askPriceInUSDT,
       askExpiresAt,
-      fmvInUsd,
-      fmvUpdatedAt,
+      rixPriceInUsd,
+      rixPriceUpdatedAt,
       backImageUrl,
       ...rest
     } = collectible;
@@ -74,8 +76,8 @@ export const CardDetailV2Schema = z
       ...rest,
       askPriceInUsdt: askPriceInUSDT === 'NO-ASK-PRICE' ? null : askPriceInUSDT,
       askExpiresAt: askExpiresAt ?? null,
-      fmvInUsd: fmvInUsd === 'NO-FMV-PRICE' ? null : fmvInUsd,
-      fmvUpdatedAt: fmvUpdatedAt ?? null,
+      rixPriceInUsd: rixPriceInUsd === 'NO-RIX-PRICE' ? null : rixPriceInUsd,
+      rixPriceUpdatedAt: rixPriceUpdatedAt ?? null,
       backImageUrl: backImageUrl ?? null,
       pricing: {
         topBid: pricing.top_offer,

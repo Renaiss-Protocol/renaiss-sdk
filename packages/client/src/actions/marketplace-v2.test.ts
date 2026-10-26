@@ -246,8 +246,8 @@ describe('v2 marketplace boundaries', () => {
             name: 'Card',
             ownerAddress: account.address,
             askPriceInUSDT: 'NO-ASK-PRICE',
-            fmvInUsd: 'NO-FMV-PRICE',
-            fmvUpdatedAt: null,
+            rixPriceInUsd: 'NO-RIX-PRICE',
+            rixPriceUpdatedAt: null,
             frontImageUrl: 'https://example.com/slab.png',
             type: 'POKEMON',
             attributes: [
@@ -264,7 +264,7 @@ describe('v2 marketplace boundaries', () => {
     expect(card).toMatchObject({
       type: 'POKEMON',
       askPriceInUsdt: null,
-      fmvInUsd: null,
+      rixPriceInUsd: null,
       backImageUrl: null,
       attributes: [
         { key: 'Grader', value: 'PSA' },
@@ -292,8 +292,8 @@ describe('v2 marketplace boundaries', () => {
             name: 'Card',
             ownerAddress: account.address,
             askPriceInUSDT: amount,
-            fmvInUsd: '9007199254740993123',
-            fmvUpdatedAt: null,
+            rixPriceInUsd: '9007199254740993123',
+            rixPriceUpdatedAt: null,
             frontImageUrl: 'https://example.com/slab.png',
           },
         ],
@@ -317,7 +317,7 @@ describe('v2 marketplace boundaries', () => {
     const first = value(await pages.firstPage());
     expect(first.items[0]?.askPriceInUsdt).toBe(amount);
     expect(first.items[0]?.frontImageUrl).toContain('slab');
-    expect(first.items[0]?.fmvInUsd).toBe('9007199254740993123');
+    expect(first.items[0]?.rixPriceInUsd).toBe('9007199254740993123');
     expect(first.nextCursor).toBeDefined();
     const all = [];
     for await (const page of pages) all.push(value(page));

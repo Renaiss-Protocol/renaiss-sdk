@@ -712,7 +712,7 @@ export interface paths {
         };
         /**
          * List VRF gacha packs
-         * @description Returns public VRF gacha pack metadata, including pack and gacha machine video URLs. Use stage to filter by computed public pack stage.
+         * @description Returns public VRF gacha pack metadata, including pack and gacha machine video URLs. Use stage to filter by computed public pack stage. A builder key in `x-builder-api-key` is optional. With it you also see the packs open only to your builder, and the call counts toward that key's rate limit.
          */
         get: {
             parameters: {
@@ -782,6 +782,79 @@ export interface paths {
                         };
                     };
                 };
+                /**
+                 * @description The supplied builder key is not accepted.
+                 *
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication credential is invalid",
+                         *       "code": "API_AUTH_INVALID_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The supplied credential is not allowed on this public read.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: omit credentials, or send only an optional builder key in `x-builder-api-key`.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
+                /**
+                 * @description Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication rate limit exceeded",
+                         *       "code": "API_AUTH_RATE_LIMITED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
+                        };
+                    };
+                };
                 /** @description A failure on our side. Retry later. */
                 500: {
                     headers: {
@@ -819,7 +892,7 @@ export interface paths {
         };
         /**
          * Preview the VRF pack's eligible collectible catalog
-         * @description Preview the collectibles eligible for this pack, with images, tiers and catalog buyback values. Pagination totals count eligible catalog entries. They do not indicate remaining inventory or guarantee which collectible a future pull will reveal. Get an actual buyback offer after the pull resolves.
+         * @description Preview the collectibles eligible for this pack, with images, tiers and catalog buyback values. Pagination totals count eligible catalog entries. They do not indicate remaining inventory or guarantee which collectible a future pull will reveal. Get an actual buyback offer after the pull resolves. A builder key in `x-builder-api-key` is optional. With it you also see the packs open only to your builder, and the call counts toward that key's rate limit.
          */
         get: {
             parameters: {
@@ -844,6 +917,8 @@ export interface paths {
                     content: {
                         "application/json": {
                             collectibles: {
+                                /** @description The catalog collectible's token ID, as a decimal string. */
+                                tokenId: string;
                                 name: string;
                                 tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
                                 buybackBaseValueInUsd: string;
@@ -853,15 +928,6 @@ export interface paths {
                                  * @enum {string}
                                  */
                                 type: "POKEMON" | "ONE_PIECE" | "SPORTS";
-                                /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market. Null for a collectible that has none yet. */
-                                fmvInUsd: string | null;
-                                /** @description When fmvInUsd was last updated. Null without one. */
-                                fmvUpdatedAt: string | null;
-                                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
-                                attributes: {
-                                    key: string;
-                                    value: string;
-                                }[];
                             }[];
                             pagination: {
                                 total: number;
@@ -890,6 +956,55 @@ export interface paths {
                         };
                     };
                 };
+                /**
+                 * @description The supplied builder key is not accepted.
+                 *
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication credential is invalid",
+                         *       "code": "API_AUTH_INVALID_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The supplied credential is not allowed on this public read.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: omit credentials, or send only an optional builder key in `x-builder-api-key`.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -907,7 +1022,11 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Too many requests - upstream rate limit reached */
+                /**
+                 * @description Too many requests - upstream rate limit reached; Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -921,6 +1040,11 @@ export interface paths {
                              */
                             code: "SUBGRAPH_RATE_LIMITED";
                             message: string;
+                        } | {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
                         };
                     };
                 };
@@ -979,7 +1103,7 @@ export interface paths {
         };
         /**
          * Get VRF gacha pack pull history
-         * @description Returns collectibles pulled from this pack, newest first, without repeated pack metadata. A limited pack has no public pull history: the list is always empty. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A pull appears here only after its buyback window has closed. The feed therefore runs behind live activity by that window, which is 24 hours on most public packs. The delay is intentional: while the window is open the puller can still sell the collectible back, so the feed waits until every entry is settled one way or the other. Every entry is on-chain by the time it shows up and can be checked at https://fair.renaiss.xyz/verify-a-rip. No pull time is returned, since any timestamp would describe the reveal rather than the pull. Pagination uses hasMore and covers recent activity. Deep pages may be incomplete, so this feed is not a complete historical export.
+         * @description Returns collectibles pulled from this pack, newest first, without repeated pack metadata. A limited pack has no public pull history: the list is always empty. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A pull appears here once its buyback window has closed or 24 hours have passed since it resolved, whichever comes first. On a pack whose window is longer than 24 hours, a pull therefore shows while the puller can still sell the collectible back. Every entry is on-chain by the time it shows up and can be checked at https://fair.renaiss.xyz/verify-a-rip. No pull time is returned, since any timestamp would describe the reveal rather than the pull. Only the pack's 100 most recent pulls are served: pagination uses hasMore, and an offset of 100 or more returns an empty page. This feed is not a historical export. A builder key in `x-builder-api-key` is optional. With it you also see the packs open only to your builder, and the call counts toward that key's rate limit.
          */
         get: {
             parameters: {
@@ -1006,7 +1130,15 @@ export interface paths {
                                 tokenId: string;
                                 name: string;
                                 tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
+                                /** @description The collectible's base buyback value in USD cents, bonus included. */
                                 buybackBaseValueInUsd: string;
+                                /** @description The collectible's buyback bonus, available with a verified builder key. Null for anonymous callers or a collectible without a bonus. */
+                                buybackBonus: {
+                                    /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                                    originalBuybackBaseValueInUSD: string;
+                                    /** @description The bonus in basis points: 2000 means +20%. */
+                                    bonusBps: number;
+                                } | null;
                                 /** Format: uri */
                                 frontImageUrl: string;
                                 /**
@@ -1041,6 +1173,55 @@ export interface paths {
                         };
                     };
                 };
+                /**
+                 * @description The supplied builder key is not accepted.
+                 *
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication credential is invalid",
+                         *       "code": "API_AUTH_INVALID_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The supplied credential is not allowed on this public read.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: omit credentials, or send only an optional builder key in `x-builder-api-key`.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
                 /** @description Pack not found */
                 404: {
                     headers: {
@@ -1058,43 +1239,32 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Too many requests right now */
+                /**
+                 * @description Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
                 429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Possible codes:
-                             *     - `SUBGRAPH_RATE_LIMITED`: Too many requests right now. Retry after a short wait.
-                             * @enum {string}
-                             */
-                            code: "SUBGRAPH_RATE_LIMITED";
-                            message: string;
-                        };
-                    };
-                };
-                /** @description A failure on our side. Retry later. */
-                500: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         /**
                          * @example {
-                         *       "code": "FUNCTION_ERROR",
-                         *       "message": "Unable to load pull history"
+                         *       "error": "Authentication rate limit exceeded",
+                         *       "code": "API_AUTH_RATE_LIMITED"
                          *     }
                          */
                         "application/json": {
-                            code: string;
-                            message: string;
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
                         };
                     };
                 };
                 /** @description A failure on our side. Retry later. */
-                502: {
+                500: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1130,7 +1300,7 @@ export interface paths {
         };
         /**
          * Get VRF gacha pack by slug
-         * @description Returns public metadata, whole-set rounded tier percentages, storefront catalog value ranges and headline buyback percentage. expectedValueInUsd is stored pack metadata; activeSetExpectedValueInUsd is the whole-set mean used by the renaiss.xyz v3 machine. Neither EV describes remaining undrawn collectibles. Monetary values are decimal strings: USD uses 2 decimals, USDT uses 18.
+         * @description Returns public metadata, whole-set rounded tier percentages, storefront catalog value ranges and headline buyback percentage. expectedValueInUsd is stored pack metadata; activeSetExpectedValueInUsd is the whole-set mean used by the renaiss.xyz v3 machine. Neither EV describes remaining undrawn collectibles. Monetary values are decimal strings: USD uses 2 decimals, USDT uses 18. A builder key in `x-builder-api-key` is optional. With it you also see the packs open only to your builder, and the call counts toward that key's rate limit.
          */
         get: {
             parameters: {
@@ -1183,7 +1353,7 @@ export interface paths {
                                 }[];
                                 /** @description Mean base collectible value across every slot in the selected active set, including collectibles already drawn, in USD cents, rounded half-up to the nearest cent; 0 for an empty set. This is the EV displayed by the renaiss.xyz v3 machine, before buyback percentage, not the EV of remaining collectibles or a guaranteed return. */
                                 activeSetExpectedValueInUsd: string;
-                                /** @description The pack's buyback tiers, soonest end first. A draw resolved now gets these tiers and keeps them: a later change to the pack reaches new draws only. A buyback pays the percent of the first tier whose buybackExpiredInSeconds has not passed since the draw resolved; a tier still applies at that second. The largest buybackExpiredInSeconds is the longest window: a collectible is released, and a pull appears in GET /v2/gacha/packs/{slug}/pull-history, only after it. Empty when the pack has no tiers. Read GET /v2/gacha/buyback/offers for the actual amount and expiry. */
+                                /** @description The pack's buyback tiers, soonest end first. A draw resolved now gets these tiers and keeps them: a later change to the pack reaches new draws only. A buyback pays the percent of the first tier whose buybackExpiredInSeconds has not passed since the draw resolved; a tier still applies at that second. The largest buybackExpiredInSeconds is the longest window: a collectible is released only after it, and a pull appears in GET /v2/gacha/packs/{slug}/pull-history after it or after 24 hours, whichever is shorter. Empty when the pack has no tiers. Read GET /v2/gacha/buyback/offers for the actual amount and expiry. */
                                 buybackConfig: {
                                     /** @description Share of the collectible's base value the buyback pays, e.g. 85 means 85%. */
                                     buybackPercentage: number;
@@ -1212,6 +1382,55 @@ export interface paths {
                         };
                     };
                 };
+                /**
+                 * @description The supplied builder key is not accepted.
+                 *
+                 *     - `API_AUTH_INVALID_CREDENTIAL`: the builder key is malformed, unknown, expired or revoked. Check the key. Do not retry with the same key.
+                 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Authentication credential is invalid",
+                         *       "code": "API_AUTH_INVALID_CREDENTIAL"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_INVALID_CREDENTIAL";
+                        };
+                    };
+                };
+                /**
+                 * @description The supplied credential is not allowed on this public read.
+                 *
+                 *     - `API_AUTH_CREDENTIAL_NOT_ALLOWED`: omit credentials, or send only an optional builder key in `x-builder-api-key`.
+                 *     - `GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API`: this builder key cannot be used on this API. Do not retry; contact Renaiss.
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "error": "Credential is not allowed by this policy",
+                         *       "code": "API_AUTH_CREDENTIAL_NOT_ALLOWED"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_CREDENTIAL_NOT_ALLOWED" | "GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API";
+                        };
+                    };
+                };
                 /** @description Pack not found */
                 404: {
                     headers: {
@@ -1229,7 +1448,11 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Too many requests - upstream rate limit reached */
+                /**
+                 * @description Too many requests - upstream rate limit reached; Too many requests with this builder key.
+                 *
+                 *     - `API_AUTH_RATE_LIMITED`: the builder key hit its rate limit. Wait a little, then retry at a lower rate.
+                 */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -1243,6 +1466,11 @@ export interface paths {
                              */
                             code: "SUBGRAPH_RATE_LIMITED";
                             message: string;
+                        } | {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            /** @enum {string} */
+                            code: "API_AUTH_RATE_LIMITED";
                         };
                     };
                 };
@@ -1614,7 +1842,6 @@ export interface paths {
                  *     | --- | --- | --- |
                  *     | `permitFundTxHash` | hash | The funding transaction hash. |
                  *     | `packName` | string | The pack name. |
-                 *     | `status` | string | Always `RESOLVED`. |
                  *     | `pulledAt` | date-time or null | When the funding transaction was mined. |
                  *     | `draws` | array | One entry per collectible, in order. |
                  *     | `draws[].settlementId` | hash | Identifies this collectible for a buyback. |
@@ -1622,14 +1849,12 @@ export interface paths {
                  *     | `draws[].releaseTxHash` | hash or null | Set once the collectible was sent to the wallet. |
                  *     | `draws[].buybackTxHash` | hash or null | Set once the collectible was sold back. |
                  *     | `draws[].tier` | string | The collectible's tier for this draw. |
-                 *     | `draws[].buybackBaseValueInUSD` | string | Base value in USD cents, frozen for this draw. |
-                 *     | `draws[].collectible` | object | What the drawn collectible is. Same shape as in `GET /v2/gacha/draw-status`. |
-                 *     | `draws[].collectible.type` | string | The collectible's category: POKEMON, ONE_PIECE or SPORTS. |
-                 *     | `draws[].collectible.name` | string | Grade, year, set, number and title. |
-                 *     | `draws[].collectible.frontImageUrl` | url | The graded slab in its Renaiss frame, on a dark background. |
-                 *     | `draws[].collectible.fmvInUsd` | string or null | Current market value in USD cents, as on renaiss.xyz; not the buyback value. |
-                 *     | `draws[].collectible.fmvUpdatedAt` | date-time or null | When `fmvInUsd` was last updated. |
-                 *     | `draws[].collectible.attributes` | array | `{ trait, value }` pairs: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. Empty traits are left out. |
+                 *     | `draws[].buybackBaseValueInUSD` | string | Base value in USD cents, frozen for this draw, bonus included. |
+                 *     | `draws[].buybackBonus` | object or null | The buyback bonus of this collectible: originalBuybackBaseValueInUSD (the value before the bonus, USD cents) and bonusBps (2000 = +20%). The base value above and the buybackTiers amounts already include it: do not apply it again. Null when there is no bonus. |
+                 *     | `draws[].type` | string | The collectible's category: POKEMON, ONE_PIECE or SPORTS. |
+                 *     | `draws[].name` | string | Grade, year, set, number and title. |
+                 *     | `draws[].frontImageUrl` | url | The graded slab in its Renaiss frame, on a dark background. |
+                 *     | `draws[].attributes` | array | `{ key, value }` pairs: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. Empty traits are left out. |
                  *
                  *     `pull_failed` adds (schema `GachaV2PullStreamFailedData`):
                  *
@@ -1654,8 +1879,7 @@ export interface paths {
                  *     - `PERMIT_EXPIRED`: the signed pull expired before it was sent, so no payment was made. You can prepare a new pull and sign it again.
                  *     - `WRONG_REQUEST_PARAMS`: the wallet cannot be used for this pull. Use another wallet. You can prepare a new pull after fixing it.
                  *     - `CONTRACT_WALLET_CANNOT_RECEIVE_NFT`: the wallet is a contract that cannot receive the collectible. Use a wallet that can receive collectibles. You can prepare a new pull after fixing it.
-                 *     - `INSUFFICIENT_ALLOWANCE`: the wallet has not approved enough USDT for this pull. Approve at least the required amount from the prepare response. You can prepare a new pull after fixing it.
-                 *     - `INSUFFICIENT_USDT_AMOUNT`: the wallet does not hold enough USDT. Add funds.
+                 *     - `INSUFFICIENT_USDT_AMOUNT`: the wallet does not hold enough USDT, or has not approved enough for Permit2, so no payment was made. Add funds or approve at least the required amount from the prepare response, then send the same signed pull again before its deadline, or prepare a new one.
                  *     - `CARD_PACK_NOT_FOUND`: the pack does not exist. Do not retry.
                  *     - `CARD_PACK_NOT_ACTIVE`: the pack is not on sale. Do not retry; show the pack as unavailable.
                  *     - `GACHA_V3_NO_SELLABLE_LINEUP`: the pack has no collectibles ready to sell. Try again later.
@@ -1663,6 +1887,7 @@ export interface paths {
                  *     - `GACHA_V3_PRICE_MISMATCH`: the pack price changed after you prepared the pull. Prepare again and sign the new data.
                  *     - `PERMIT2_NONCE_ALREADY_USED`: this signed pull was already used. Do not sign it again.
                  *     - `GACHA_V3_CHECKOUT_ALREADY_PROCESSED`: this pull was already processed. Do not pull again.
+                 *     - `OP_WALLET_BUSY`: every payment sender is busy, so no payment was made. Send the same signed pull again after a few seconds, before its deadline, or prepare a new one.
                  *     - `CONTRACT_REVERT`: the payment transaction was rejected by the chain. Check that the wallet holds enough USDT and has approved it.
                  *     - Any other code: a failure on our side. Do not sign a new pull yet: read `GET /v2/gacha/pull-history` for the wallet to see whether it went through, then try again later.
                  *
@@ -1686,7 +1911,7 @@ export interface paths {
                  *     ```
                  *     ```
                  *     event: draws_resolved
-                 *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your collectibles are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","status":"RESOLVED","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"tier":"rare","buybackBaseValueInUSD":"4500","collectible":{"type":"POKEMON","name":"PSA 10 Gem Mint 2025 Example Set #001 Example Collectible","frontImageUrl":"https://example.com/collectibles/example-front.png","fmvInUsd":"5200","fmvUpdatedAt":"2026-01-14T08:00:00.000Z","attributes":[{"key":"Grader","value":"PSA"},{"key":"Grade","value":"10 Gem Mint"},{"key":"Cert Number","value":"PSA00000001"},{"key":"Year","value":"2025"},{"key":"Set","value":"Example Set"},{"key":"Card Number","value":"001"},{"key":"Character","value":"Example Collectible"},{"key":"Language","value":"English"}]}}]}
+                 *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your collectibles are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"buybackTiers":[{"buybackPercentage":90,"amountInUsdt":"40500000000000000000","expiresAt":"2026-01-15T11:30:04.000Z"},{"buybackPercentage":85,"amountInUsdt":"38250000000000000000","expiresAt":"2026-01-16T10:30:04.000Z"},{"buybackPercentage":80,"amountInUsdt":"36000000000000000000","expiresAt":"2026-01-18T10:30:04.000Z"}],"tier":"rare","buybackBaseValueInUSD":"4500","buybackBonus":{"originalBuybackBaseValueInUSD":"3750","bonusBps":2000},"type":"POKEMON","name":"PSA 10 Gem Mint 2025 Example Set #001 Example Collectible","frontImageUrl":"https://example.com/collectibles/example-front.png","attributes":[{"key":"Grader","value":"PSA"},{"key":"Grade","value":"10 Gem Mint"},{"key":"Cert Number","value":"PSA00000001"},{"key":"Year","value":"2025"},{"key":"Set","value":"Example Set"},{"key":"Card Number","value":"001"},{"key":"Character","value":"Example Collectible"},{"key":"Language","value":"English"}]}]}
                  *     ```
                  *     ```
                  *     event: pull_failed
@@ -1712,7 +1937,7 @@ export interface paths {
                          *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Payment confirmed. Resolving your collectibles.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a"}
                          *
                          *     event: draws_resolved
-                         *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your collectibles are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","status":"RESOLVED","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"tier":"rare","buybackBaseValueInUSD":"4500","collectible":{"type":"POKEMON","name":"PSA 10 Gem Mint 2025 Example Set #001 Example Collectible","frontImageUrl":"https://example.com/collectibles/example-front.png","fmvInUsd":"5200","fmvUpdatedAt":"2026-01-14T08:00:00.000Z","attributes":[{"key":"Grader","value":"PSA"},{"key":"Grade","value":"10 Gem Mint"},{"key":"Cert Number","value":"PSA00000001"},{"key":"Year","value":"2025"},{"key":"Set","value":"Example Set"},{"key":"Card Number","value":"001"},{"key":"Character","value":"Example Collectible"},{"key":"Language","value":"English"}]}}]}
+                         *     data: {"buyerWalletAddress":"0x4f2a9c1e7b3d58a60c9e1f2b3d4a5c6e7f8091a2","packId":"3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6c4f13","nonce":"48210937465120938475","numOfTokens":1,"message":"Your collectibles are ready.","permitFundTxHash":"0x9c1d0e4a7b2f6385a1c9d4e7f20b3a6c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a","packName":"Example Pack","pulledAt":"2026-01-15T10:30:00.000Z","draws":[{"settlementId":"0x2b7e4c9a1d5f8036e2a4c7b9d1f3058a6c8e0b2d4f6a8c0e1b3d5f7a9c2e4b60","tokenId":"1234567","releaseTxHash":null,"buybackTxHash":null,"buybackTiers":[{"buybackPercentage":90,"amountInUsdt":"40500000000000000000","expiresAt":"2026-01-15T11:30:04.000Z"},{"buybackPercentage":85,"amountInUsdt":"38250000000000000000","expiresAt":"2026-01-16T10:30:04.000Z"},{"buybackPercentage":80,"amountInUsdt":"36000000000000000000","expiresAt":"2026-01-18T10:30:04.000Z"}],"tier":"rare","buybackBaseValueInUSD":"4500","buybackBonus":{"originalBuybackBaseValueInUSD":"3750","bonusBps":2000},"type":"POKEMON","name":"PSA 10 Gem Mint 2025 Example Set #001 Example Collectible","frontImageUrl":"https://example.com/collectibles/example-front.png","attributes":[{"key":"Grader","value":"PSA"},{"key":"Grade","value":"10 Gem Mint"},{"key":"Cert Number","value":"PSA00000001"},{"key":"Year","value":"2025"},{"key":"Set","value":"Example Set"},{"key":"Card Number","value":"001"},{"key":"Character","value":"Example Collectible"},{"key":"Language","value":"English"}]}]}
                          */
                         "text/event-stream": string;
                     };
@@ -1887,7 +2112,7 @@ export interface paths {
         };
         /**
          * Get the status of one of this builder's pulls by confirmed funding transaction
-         * @description Requires only the builder API key. The requested wallet and funding transaction must belong to the verified builder code; another builder's transaction returns 404. Omit wallet access tokens. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
+         * @description Requires only the builder API key. The requested wallet and funding transaction must belong to the verified builder code; another builder's transaction returns 404. Omit wallet access tokens. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows a pull once its window closes or 24 hours after it resolved, whichever is first.
          */
         get: {
             parameters: {
@@ -1923,37 +2148,43 @@ export interface paths {
                                 tokenId: string;
                                 releaseTxHash: string | null;
                                 buybackTxHash: string | null;
+                                /** @description Every buyback tier of this draw, past ones too, soonest end first, with the same prices as GET /v2/gacha/buyback/offers. The price at a moment is the amountInUsdt of the first tier whose expiresAt has not passed; a tier still applies at its expiresAt. Use it to display the offer. Before the user confirms a buyback, read GET /v2/gacha/buyback/offers and sign the amount it returns. The list stays the same after the collectible is sold back or delivered: read buybackTxHash and releaseTxHash for that. Empty when the draw has no buyback. */
+                                buybackTiers: {
+                                    /** @description Percent of the card's base value, e.g. 90 means 90%. */
+                                    buybackPercentage: number;
+                                    /** @description Price in USDT with 18 decimals in this tier. */
+                                    amountInUsdt: string;
+                                    /** @description When this tier ends. The tier still applies at that moment. */
+                                    expiresAt: string;
+                                }[];
                                 /** @description The collectible's tier for this draw. Null when the collectible details could not be loaded. */
                                 tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown") | null;
-                                /** @description The collectible's base buyback value in USD cents. Null when the collectible details could not be loaded. */
+                                /** @description The collectible's base buyback value in USD cents, bonus included. Null when the collectible details could not be loaded. */
                                 buybackBaseValueInUSD: string | null;
-                                /** @description What the drawn collectible is. Null when the collectible details could not be loaded. */
-                                collectible: {
-                                    /**
-                                     * @description The collectible's category.
-                                     * @enum {string}
-                                     */
-                                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
-                                    /** @description Grade, year, set, number and title. */
-                                    name: string;
-                                    /**
-                                     * Format: uri
-                                     * @description The graded slab in its Renaiss frame, on a dark background.
-                                     */
-                                    frontImageUrl: string;
-                                    /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market and is not the buyback value. Null for a collectible that has none yet. */
-                                    fmvInUsd: string | null;
-                                    /**
-                                     * Format: date-time
-                                     * @description When fmvInUsd was last updated. Null without one.
-                                     */
-                                    fmvUpdatedAt: string | null;
-                                    /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
-                                    attributes: {
-                                        key: string;
-                                        value: string;
-                                    }[];
+                                /** @description The buyback bonus of this collectible. The base buyback value field next to it and the buybackTiers amounts already include the bonus: do not apply it again. Null when the collectible has no bonus. Null when the collectible details could not be loaded. */
+                                buybackBonus: {
+                                    /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                                    originalBuybackBaseValueInUSD: string;
+                                    /** @description The bonus in basis points: 2000 means +20%. */
+                                    bonusBps: number;
                                 } | null;
+                                /**
+                                 * @description The collectible's category.
+                                 * @enum {string}
+                                 */
+                                type?: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                /** @description Grade, year, set, number and title. */
+                                name?: string;
+                                /**
+                                 * Format: uri
+                                 * @description The graded slab in its Renaiss frame, on a dark background.
+                                 */
+                                frontImageUrl?: string;
+                                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                                attributes?: {
+                                    key: string;
+                                    value: string;
+                                }[];
                             }[];
                         };
                     };
@@ -2118,7 +2349,7 @@ export interface paths {
         };
         /**
          * List a wallet's resolved pulls for this builder, grouped by funding transaction
-         * @description Requires only the builder API key. Filters by the requested wallet and the builder code from that key before pagination. No records from another builder are returned. Omit wallet access tokens. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
+         * @description Requires only the builder API key. Filters by the requested wallet and the builder code from that key before pagination. No records from another builder are returned. Omit wallet access tokens. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows a pull once its window closes or 24 hours after it resolved, whichever is first.
          */
         get: {
             parameters: {
@@ -2300,7 +2531,7 @@ export interface paths {
         };
         /**
          * List a wallet's eligible buybacks for this builder
-         * @description Requires only the builder API key. Returns eligible draws for the requested wallet attributed to the builder code from that key. Omit wallet access tokens. Accepting a buyback still requires the wallet's action signature. Each offer lists its buyback tiers in buybackTiers: the price now is the amountInUsdt of the first tier whose expiresAt has not passed, and the offer ends at the expiresAt of its last positive-amount buybackTiers item. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows pulls only after their windows close.
+         * @description Requires only the builder API key. Returns eligible draws for the requested wallet attributed to the builder code from that key. Omit wallet access tokens. Accepting a buyback still requires the wallet's action signature. Each offer lists its buyback tiers in buybackTiers: the price now is the amountInUsdt of the first tier whose expiresAt has not passed, and the offer ends at the expiresAt of its last positive-amount buybackTiers item. For fairness to the pack's users, collectibles stay with Renaiss during their buyback windows. A collectible's buyback window closes at the largest buybackExpiredInSeconds in buybackConfig from GET /v2/gacha/packs/{slug}, counted from when its pull resolved; a pull keeps the tiers the pack had at that moment. A collectible that was not sold back is transferred to the wallet after its window closes; check releaseTxHash and on-chain ownership to confirm delivery. The public feed at GET /v2/gacha/packs/{slug}/pull-history shows a pull once its window closes or 24 hours after it resolved, whichever is first.
          */
         get: {
             parameters: {
@@ -2691,6 +2922,29 @@ export interface paths {
                          * @example {
                          *       "error": "Internal server error",
                          *       "code": "FUNCTION_ERROR"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @description A short sentence about what went wrong. */
+                            error: string;
+                            code: string;
+                        };
+                    };
+                };
+                /**
+                 * @description A failure on our side. Every payment sender is busy: nothing was sent and nothing changed. Send the same signed buyback again after the `Retry-After` seconds.
+                 *
+                 *     - `OP_WALLET_BUSY`: every payment sender is busy. Retry the request.
+                 */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "code": "OP_WALLET_BUSY",
+                         *       "error": "Payments are busy right now and nothing was charged. Please try again in a few seconds."
                          *     }
                          */
                         "application/json": {
@@ -4957,7 +5211,7 @@ export interface paths {
                     listedOnly?: boolean;
                     limit?: number;
                     offset?: number | null;
-                    sortBy?: "listDate" | "mintDate" | "name" | "year" | "priceRange" | "askPriceInUSDT" | "fmvInUsd";
+                    sortBy?: "listDate" | "mintDate" | "name" | "year" | "priceRange" | "askPriceInUSDT" | "rixPriceInUsd";
                 };
                 header?: never;
                 path?: never;
@@ -4979,11 +5233,11 @@ export interface paths {
                                 ownerAddress: string;
                                 /** @description 18-decimal USDT base units, or NO-ASK-PRICE */
                                 askPriceInUSDT: string;
-                                fmvUpdatedAt?: string | null;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                /** @description USD cents, or NO-FMV-PRICE */
-                                fmvInUsd: string;
+                                /** @description USD cents, or NO-RIX-PRICE */
+                                rixPriceInUsd: string;
+                                rixPriceUpdatedAt?: string | null;
                             }[];
                             pagination: {
                                 total: number;
@@ -5065,7 +5319,6 @@ export interface paths {
                                 /** @description 18-decimal USDT base units, or NO-ASK-PRICE */
                                 askPriceInUSDT: string;
                                 askExpiresAt?: string;
-                                fmvUpdatedAt?: string | null;
                                 /** Format: uri */
                                 frontImageUrl: string;
                                 /**
@@ -5078,8 +5331,9 @@ export interface paths {
                                     key: string;
                                     value: string;
                                 }[];
-                                /** @description USD cents, or NO-FMV-PRICE */
-                                fmvInUsd: string;
+                                /** @description USD cents, or NO-RIX-PRICE */
+                                rixPriceInUsd: string;
+                                rixPriceUpdatedAt?: string | null;
                                 owner: {
                                     username: string;
                                     /** Format: uri */
@@ -5261,7 +5515,7 @@ export interface paths {
                 query?: {
                     search?: string;
                     countryCode?: string;
-                    sortBy?: "createdAt" | "fmv";
+                    sortBy?: "createdAt" | "rixPriceInUsd";
                     sortOrder?: "asc" | "desc";
                     page?: number;
                     limit?: number;
@@ -5284,9 +5538,9 @@ export interface paths {
                                 name: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                fmvInUsd: string | null;
+                                rixPriceInUsd: string | null;
                                 /** Format: date-time */
-                                fmvUpdatedAt: string | null;
+                                rixPriceUpdatedAt: string | null;
                                 /** Format: date-time */
                                 ownerAcquiredAt: string | null;
                                 regionCountryCode: string;
@@ -6727,7 +6981,7 @@ export interface paths {
                                     name: string;
                                     /** Format: uri */
                                     frontImageUrl: string;
-                                    fmvInUsd: string | null;
+                                    rixPriceInUsd: string | null;
                                 }[];
                             }[];
                             hasMore: boolean;
@@ -6932,9 +7186,9 @@ export interface paths {
                                 name: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                fmvInUsd: string | null;
+                                rixPriceInUsd: string | null;
                                 /** Format: date-time */
-                                fmvUpdatedAt: string | null;
+                                rixPriceUpdatedAt: string | null;
                                 regionCountryCode: string;
                                 vaultDisplayName: string;
                             }[];
@@ -7165,9 +7419,9 @@ export interface paths {
                                 name: string;
                                 /** Format: uri */
                                 frontImageUrl: string;
-                                fmvInUsd: string | null;
+                                rixPriceInUsd: string | null;
                                 /** Format: date-time */
-                                fmvUpdatedAt: string | null;
+                                rixPriceUpdatedAt: string | null;
                                 regionCountryCode: string;
                                 vaultDisplayName: string;
                             }[];
@@ -7334,8 +7588,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Count a wallet's collectibles and total their market value
-         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. The count and the total are over exactly the collectibles GET /v2/users/{walletAddress}/collectibles lists for your builder key.
+         * Count a wallet's collectibles and total their RIX price
+         * @description Requires only the builder API key. Reads owned collectibles acquired elsewhere and collectibles the wallet pulled with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. The count and the total are over exactly the collectibles GET /v2/users/{walletAddress}/collectibles lists for your builder key.
          */
         get: {
             parameters: {
@@ -7358,10 +7612,10 @@ export interface paths {
                         "application/json": {
                             /** @description How many collectibles GET /v2/users/{walletAddress}/collectibles lists for the wallet and your builder key. */
                             collectibleCount: number;
-                            /** @description The sum of those collectibles' fmvInUsd, in USD cents. */
-                            totalFmvInUsd: string;
-                            /** @description How many of those collectibles have no market value and add nothing. */
-                            collectiblesWithoutFmv: number;
+                            /** @description The sum of those collectibles' rixPriceInUsd, in USD cents. */
+                            totalRixPriceInUsd: string;
+                            /** @description How many of those collectibles have no RIX price and add nothing. */
+                            collectiblesWithoutRixPrice: number;
                         };
                     };
                 };
@@ -7501,16 +7755,17 @@ export interface paths {
         };
         /**
          * List the collectibles a wallet has
-         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. A collectible is listed while the wallet owns it on chain, however it got it. A collectible the wallet pulled with your builder key is also listed while Renaiss still holds it (its buyback window, then until delivery); a collectible it pulled with another builder or on renaiss.xyz appears once it is delivered on chain. If a contract wallet never accepts delivery, the collectible leaves the list and the totals, with no delivery-failure activity and no refund. A collectible that was sold, sold back, transferred away or redeemed is not listed. Sorting and paging apply to the whole list.
+         * @description Requires only the builder API key. Reads owned collectibles acquired elsewhere and collectibles the wallet pulled with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. A collectible the wallet pulled with your builder key is listed while Renaiss holds it (its buyback window, then until delivery) and, once delivered, while the wallet owns it on chain. An owned collectible acquired by marketplace purchase or transfer is listed with pull null when it has no current pull by this wallet. If this wallet pulled the collectible, that pull must be EXTERNAL and match your builder key; another builder's pull is excluded even after delivery. If a contract wallet never accepts delivery, the collectible leaves the list and the totals, with no delivery-failure activity and no refund. A collectible that was sold, sold back, transferred away or redeemed is not listed. Sorting, paging and pagination.total apply to the list after the optional tokenIds filter. The wallet summary endpoint is unaffected.
          */
         get: {
             parameters: {
                 query?: {
-                    /** @description pulledAt: when the wallet pulled the collectible with your builder key. fmvInUsd: its market value. buybackExpiresAt: when its current buyback price tier ends; a later tier can remain available. A collectible without the value sorts last in both directions. */
-                    sortBy?: "pulledAt" | "fmvInUsd" | "buybackExpiresAt";
+                    /** @description pulledAt: when the wallet pulled the collectible with your builder key. rixPriceInUsd: its RIX price. buybackExpiresAt: when its current buyback tier ends, the expiresAt of the first tier in state.buybackTiers that has not passed; a later tier can remain available. A collectible without the value sorts last in both directions. */
+                    sortBy?: "pulledAt" | "rixPriceInUsd" | "buybackExpiresAt";
                     sortOrder?: "asc" | "desc";
                     limit?: number;
                     offset?: number | null;
+                    tokenIds?: string[];
                 };
                 header?: never;
                 path: {
@@ -7543,18 +7798,13 @@ export interface paths {
                                  * @description The graded slab in its Renaiss frame, on a dark background.
                                  */
                                 frontImageUrl: string;
-                                /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market. Null for a collectible that has none yet. */
-                                fmvInUsd: string | null;
+                                /** @description The collectible's current RIX price (market value) in USD cents, as on renaiss.xyz. It moves with the market. Null for a collectible that has none yet. */
+                                rixPriceInUsd: string | null;
                                 /**
                                  * Format: date-time
-                                 * @description When fmvInUsd was last updated. Null without one.
+                                 * @description When rixPriceInUsd was last updated. Null without one.
                                  */
-                                fmvUpdatedAt: string | null;
-                                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
-                                attributes: {
-                                    key: string;
-                                    value: string;
-                                }[];
+                                rixPriceUpdatedAt: string | null;
                                 /** @description IN_WALLET: the wallet owns the collectible on chain. IN_BUYBACK_WINDOW: the wallet pulled the collectible with your builder key, Renaiss holds it and the wallet can still sell it back; sign the offer from GET /v2/gacha/buyback/offers. AWAITING_DELIVERY: the wallet pulled the collectible with your builder key, no buyback is offered and the collectible is not in the wallet yet. */
                                 state: {
                                     /** @enum {string} */
@@ -7562,18 +7812,29 @@ export interface paths {
                                 } | {
                                     /** @enum {string} */
                                     status: "IN_BUYBACK_WINDOW";
-                                    /** @description The price of the current buyback tier, in 18-decimal USDT units. */
-                                    buybackAmountInUsdt: string;
-                                    /**
-                                     * Format: date-time
-                                     * @description When the current price tier ends, not necessarily the final buyback or release deadline.
-                                     */
-                                    buybackExpiresAt: string;
+                                    /** @description The collectible's base buyback value for this pull, in USD cents, bonus included. Each tier pays its buybackPercentage of it. */
+                                    buybackBaseValueInUSD: string;
+                                    /** @description The buyback bonus of this collectible. The base buyback value field next to it and the buybackTiers amounts already include the bonus: do not apply it again. Null when the collectible has no bonus. */
+                                    buybackBonus: {
+                                        /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                                        originalBuybackBaseValueInUSD: string;
+                                        /** @description The bonus in basis points: 2000 means +20%. */
+                                        bonusBps: number;
+                                    } | null;
+                                    /** @description Every buyback tier of this pull, past ones too, soonest end first, with the same prices as GET /v2/gacha/buyback/offers. The price now is the amountInUsdt of the first tier whose expiresAt has not passed; a tier still applies at its expiresAt. */
+                                    buybackTiers: {
+                                        /** @description Percent of the card's base value, e.g. 90 means 90%. */
+                                        buybackPercentage: number;
+                                        /** @description Price in USDT with 18 decimals in this tier. */
+                                        amountInUsdt: string;
+                                        /** @description When this tier ends. The tier still applies at that moment. */
+                                        expiresAt: string;
+                                    }[];
                                 } | {
                                     /** @enum {string} */
                                     status: "AWAITING_DELIVERY";
                                 };
-                                /** @description The wallet's pull of this collectible with your builder key. Null for a collectible it got any other way: another builder, renaiss.xyz, a purchase or a transfer. */
+                                /** @description The wallet's pull with your builder key; null for cards acquired elsewhere. */
                                 pull: {
                                     /**
                                      * Format: uuid
@@ -7735,7 +7996,7 @@ export interface paths {
         };
         /**
          * List what a wallet did with collectibles on chain
-         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. Newest first: gacha pulls, buybacks and deliveries with any builder, marketplace buys and sells, transfers, mints and redemptions (burn). Each entry is a chain event. A pull names its pack by its on-chain id (`onChainPackId` in GET /v2/gacha/packs) and never its collectibles; a buyback names its settlement ids (`settlementId` in your GET /v2/gacha/pull-history) and its total, never its collectibles. Page with `cursor`: send the `nextCursor` of the page before; null means the end, and a page that is empty but has a cursor is not the end. Paging is by chain event, so a transaction with several events can continue on the next page.
+         * @description Requires only the builder API key. Reads the whole wallet as the chain shows it, not only what it did with your builder key, and exactly the address given: an owner wallet and its Renaiss Safe are two wallets. A wallet Renaiss operates (its stock and what it holds for buyers) reads as a wallet with nothing. Omit wallet access tokens. Newest first: gacha pulls, buybacks and deliveries with any builder (an entry tied to a pack closed to your key is left out), marketplace buys and sells, transfers, mints and redemptions (burn). Each entry is a chain event. A pull names its pack by its on-chain id (`onChainPackId` in GET /v2/gacha/packs); a buyback names its settlement ids (`settlementId` in your GET /v2/gacha/pull-history) and its total. Both may include `collectibles[]` for your resolved sales to this wallet. Other builders' ordinary-v3 draws become eligible after their frozen buyback window and confirmed delivery or buyback. Limited-pack historical links remain seller-only even after expiry, following the public v2/web limited-pack history restriction. Storefront draws retain chain facts only. Both collectible types expose frozen buybackBaseValueInUsd (USD cents); buyback also exposes nullable buybackPaidInUsdt (18-decimal units). Original event amounts remain totals. Page with `cursor`: send the `nextCursor` of the page before; null means the end, and a page that is empty but has a cursor is not the end. Paging is by chain event, so a transaction with several events can continue on the next page.
          */
         get: {
             parameters: {
@@ -7774,6 +8035,33 @@ export interface paths {
                                 checkoutIds: string[];
                                 totalAmount: string;
                                 blockHash: string;
+                                /** @description Resolved collectibles sold by your builder, or ordinary-v3 draws after their frozen buyback window and confirmed delivery/buyback. Limited-pack historical links stay seller-only, as in the public v2/web history restriction. EXTERNAL draws for this exact wallet only. Omitted when none are eligible; a batch can contain only a subset, in event identifier order. */
+                                collectibles?: {
+                                    /**
+                                     * @description The collectible's category.
+                                     * @enum {string}
+                                     */
+                                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                    /** @description Grade, year, set, number and title. */
+                                    name: string;
+                                    /**
+                                     * Format: uri
+                                     * @description The graded slab in its Renaiss frame, on a dark background.
+                                     */
+                                    frontImageUrl: string;
+                                    tokenId: string;
+                                    /** @description Series and year separated by •, as on web activities. Empty when neither is available. */
+                                    subtitle: string;
+                                    /** @description The historical draw slot's frozen buyback base value in USD cents, bonus included. Not the current collectible value or purchase price. */
+                                    buybackBaseValueInUsd: string;
+                                    /** @description The buyback bonus of this collectible. The base buyback value field next to it and the buybackTiers amounts already include the bonus: do not apply it again. Null when the collectible has no bonus. */
+                                    buybackBonus: {
+                                        /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                                        originalBuybackBaseValueInUSD: string;
+                                        /** @description The bonus in basis points: 2000 means +20%. */
+                                        bonusBps: number;
+                                    } | null;
+                                }[];
                             } | {
                                 user: string;
                                 timestamp: string;
@@ -7785,6 +8073,35 @@ export interface paths {
                                 buybackIds: string[];
                                 token: string;
                                 priceInUsdt: string;
+                                /** @description Resolved collectibles sold by your builder, or ordinary-v3 draws after their frozen buyback window and confirmed delivery/buyback. Limited-pack historical links stay seller-only, as in the public v2/web history restriction. EXTERNAL draws for this exact wallet only. Omitted when none are eligible; a batch can contain only a subset, in event identifier order. */
+                                collectibles?: {
+                                    /**
+                                     * @description The collectible's category.
+                                     * @enum {string}
+                                     */
+                                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                                    /** @description Grade, year, set, number and title. */
+                                    name: string;
+                                    /**
+                                     * Format: uri
+                                     * @description The graded slab in its Renaiss frame, on a dark background.
+                                     */
+                                    frontImageUrl: string;
+                                    tokenId: string;
+                                    /** @description Series and year separated by •, as on web activities. Empty when neither is available. */
+                                    subtitle: string;
+                                    /** @description The historical draw slot's frozen buyback base value in USD cents, bonus included. Not the current collectible value or purchase price. */
+                                    buybackBaseValueInUsd: string;
+                                    /** @description The buyback bonus of this collectible. The base buyback value field next to it and the buybackTiers amounts already include the bonus: do not apply it again. Null when the collectible has no bonus. */
+                                    buybackBonus: {
+                                        /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                                        originalBuybackBaseValueInUSD: string;
+                                        /** @description The bonus in basis points: 2000 means +20%. */
+                                        bonusBps: number;
+                                    } | null;
+                                    /** @description Buyback activities only: actual per-collectible payment in USDT units (18 decimals). Null when the historical payment cannot be confirmed. */
+                                    buybackPaidInUsdt: string | null;
+                                }[];
                             } | {
                                 user: string;
                                 timestamp: string;
@@ -8108,8 +8425,6 @@ export interface components {
                 message: string;
                 permitFundTxHash: string;
                 packName: string;
-                /** @enum {string} */
-                status: "RESOLVED";
                 /** Format: date-time */
                 pulledAt: string | null;
                 draws: {
@@ -8117,36 +8432,43 @@ export interface components {
                     tokenId: string;
                     releaseTxHash: string | null;
                     buybackTxHash: string | null;
+                    /** @description Every buyback tier of this draw, past ones too, soonest end first, with the same prices as GET /v2/gacha/buyback/offers. The price at a moment is the amountInUsdt of the first tier whose expiresAt has not passed; a tier still applies at its expiresAt. Use it to display the offer. Before the user confirms a buyback, read GET /v2/gacha/buyback/offers and sign the amount it returns. The list stays the same after the collectible is sold back or delivered: read buybackTxHash and releaseTxHash for that. Empty when the draw has no buyback. */
+                    buybackTiers: {
+                        /** @description Percent of the card's base value, e.g. 90 means 90%. */
+                        buybackPercentage: number;
+                        /** @description Price in USDT with 18 decimals in this tier. */
+                        amountInUsdt: string;
+                        /** @description When this tier ends. The tier still applies at that moment. */
+                        expiresAt: string;
+                    }[];
                     /** @description The collectible's tier for this draw. */
                     tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
-                    /** @description The collectible's base buyback value in USD cents. */
+                    /** @description The collectible's base buyback value in USD cents, bonus included. */
                     buybackBaseValueInUSD: string;
-                    collectible: {
-                        /**
-                         * @description The collectible's category.
-                         * @enum {string}
-                         */
-                        type: "POKEMON" | "ONE_PIECE" | "SPORTS";
-                        /** @description Grade, year, set, number and title. */
-                        name: string;
-                        /**
-                         * Format: uri
-                         * @description The graded slab in its Renaiss frame, on a dark background.
-                         */
-                        frontImageUrl: string;
-                        /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market and is not the buyback value. Null for a collectible that has none yet. */
-                        fmvInUsd: string | null;
-                        /**
-                         * Format: date-time
-                         * @description When fmvInUsd was last updated. Null without one.
-                         */
-                        fmvUpdatedAt: string | null;
-                        /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
-                        attributes: {
-                            key: string;
-                            value: string;
-                        }[];
-                    };
+                    /** @description The buyback bonus of this collectible. The base buyback value field next to it and the buybackTiers amounts already include the bonus: do not apply it again. Null when the collectible has no bonus. */
+                    buybackBonus: {
+                        /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                        originalBuybackBaseValueInUSD: string;
+                        /** @description The bonus in basis points: 2000 means +20%. */
+                        bonusBps: number;
+                    } | null;
+                    /**
+                     * @description The collectible's category.
+                     * @enum {string}
+                     */
+                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                    /** @description Grade, year, set, number and title. */
+                    name: string;
+                    /**
+                     * Format: uri
+                     * @description The graded slab in its Renaiss frame, on a dark background.
+                     */
+                    frontImageUrl: string;
+                    /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                    attributes: {
+                        key: string;
+                        value: string;
+                    }[];
                 }[];
             };
         } | {
@@ -8219,8 +8541,6 @@ export interface components {
             message: string;
             permitFundTxHash: string;
             packName: string;
-            /** @enum {string} */
-            status: "RESOLVED";
             /** Format: date-time */
             pulledAt: string | null;
             draws: {
@@ -8228,36 +8548,43 @@ export interface components {
                 tokenId: string;
                 releaseTxHash: string | null;
                 buybackTxHash: string | null;
+                /** @description Every buyback tier of this draw, past ones too, soonest end first, with the same prices as GET /v2/gacha/buyback/offers. The price at a moment is the amountInUsdt of the first tier whose expiresAt has not passed; a tier still applies at its expiresAt. Use it to display the offer. Before the user confirms a buyback, read GET /v2/gacha/buyback/offers and sign the amount it returns. The list stays the same after the collectible is sold back or delivered: read buybackTxHash and releaseTxHash for that. Empty when the draw has no buyback. */
+                buybackTiers: {
+                    /** @description Percent of the card's base value, e.g. 90 means 90%. */
+                    buybackPercentage: number;
+                    /** @description Price in USDT with 18 decimals in this tier. */
+                    amountInUsdt: string;
+                    /** @description When this tier ends. The tier still applies at that moment. */
+                    expiresAt: string;
+                }[];
                 /** @description The collectible's tier for this draw. */
                 tier: ("TOP" | "S" | "A" | "B" | "C" | "D") | ("epic" | "rare" | "uncommon" | "common" | "legendary" | "thorn" | "bloom" | "crown");
-                /** @description The collectible's base buyback value in USD cents. */
+                /** @description The collectible's base buyback value in USD cents, bonus included. */
                 buybackBaseValueInUSD: string;
-                collectible: {
-                    /**
-                     * @description The collectible's category.
-                     * @enum {string}
-                     */
-                    type: "POKEMON" | "ONE_PIECE" | "SPORTS";
-                    /** @description Grade, year, set, number and title. */
-                    name: string;
-                    /**
-                     * Format: uri
-                     * @description The graded slab in its Renaiss frame, on a dark background.
-                     */
-                    frontImageUrl: string;
-                    /** @description The collectible's current market value in USD cents, as on renaiss.xyz. It moves with the market and is not the buyback value. Null for a collectible that has none yet. */
-                    fmvInUsd: string | null;
-                    /**
-                     * Format: date-time
-                     * @description When fmvInUsd was last updated. Null without one.
-                     */
-                    fmvUpdatedAt: string | null;
-                    /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
-                    attributes: {
-                        key: string;
-                        value: string;
-                    }[];
-                };
+                /** @description The buyback bonus of this collectible. The base buyback value field next to it and the buybackTiers amounts already include the bonus: do not apply it again. Null when the collectible has no bonus. */
+                buybackBonus: {
+                    /** @description The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+                    originalBuybackBaseValueInUSD: string;
+                    /** @description The bonus in basis points: 2000 means +20%. */
+                    bonusBps: number;
+                } | null;
+                /**
+                 * @description The collectible's category.
+                 * @enum {string}
+                 */
+                type: "POKEMON" | "ONE_PIECE" | "SPORTS";
+                /** @description Grade, year, set, number and title. */
+                name: string;
+                /**
+                 * Format: uri
+                 * @description The graded slab in its Renaiss frame, on a dark background.
+                 */
+                frontImageUrl: string;
+                /** @description The collectible's details as key and value pairs. For a card, the keys in this order: Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language. A key without a value is left out. Every value is a string. */
+                attributes: {
+                    key: string;
+                    value: string;
+                }[];
             }[];
         };
         GachaV2PullStreamFailedData: {

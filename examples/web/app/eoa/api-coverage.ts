@@ -329,38 +329,28 @@ export const coverage: EndpointCoverage[] = [
         use: '"Buyback base value $X"',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.type',
+        field: 'draws_resolved.data.draws[].type',
         status: 'unused',
         use: 'Not displayed',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.name',
+        field: 'draws_resolved.data.draws[].name',
         status: 'shown',
         use: 'Reveal card name',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.frontImageUrl',
+        field: 'draws_resolved.data.draws[].frontImageUrl',
         status: 'shown',
         use: 'Reveal image: graded PSA slab, including its label',
       },
       {
-        field: 'draws_resolved.data.draws[].collectible.fmvInUsd',
-        status: 'unused',
-        use: 'Not displayed; the reveal prices the card by its buyback offer',
-      },
-      {
-        field: 'draws_resolved.data.draws[].collectible.fmvUpdatedAt',
-        status: 'unused',
-        use: 'Not displayed',
-      },
-      {
-        field: 'draws_resolved.data.draws[].collectible.attributes[]',
+        field: 'draws_resolved.data.draws[].attributes[]',
         status: 'unused',
         use: 'Not displayed; the name already carries the card details',
       },
       {
         field:
-          'draws_resolved.data.{permitFundTxHash,packId,packName,status,numOfTokens,pulledAt}',
+          'draws_resolved.data.{permitFundTxHash,packId,packName,numOfTokens,pulledAt}',
         status: 'shown',
         use: 'Same shape as wallet history',
       },

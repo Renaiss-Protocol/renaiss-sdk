@@ -48,12 +48,12 @@ export const coverage: EndpointCoverage[] = [
         use: '"Listed" pill, "$ 175.44" / "unlisted", hover button label (Buy now vs Make an offer)',
       },
       {
-        field: 'collection[].fmvInUsd',
+        field: 'collection[].rixPriceInUsd',
         status: 'shown',
-        use: 'Gold "FMV $ 172" badge (hidden when NO-FMV-PRICE)',
+        use: 'Gold "FMV $ 172" badge (hidden when NO-RIX-PRICE)',
       },
       {
-        field: 'collection[].fmvUpdatedAt',
+        field: 'collection[].rixPriceUpdatedAt',
         status: 'shown',
         use: 'FMV badge hover: "Fair market value · Priced 2 weeks ago"',
       },
@@ -132,12 +132,12 @@ export const coverage: EndpointCoverage[] = [
         use: 'Listing expiry in the Edit listing form',
       },
       {
-        field: 'collectible.fmvInUsd',
+        field: 'collectible.rixPriceInUsd',
         status: 'shown',
         use: '"FMV $ 172" pill in the header and in every dialog; 80%-of-FMV warning when accepting an offer',
       },
       {
-        field: 'collectible.fmvUpdatedAt',
+        field: 'collectible.rixPriceUpdatedAt',
         status: 'shown',
         use: 'FMV pill hover "Priced … ago"',
       },

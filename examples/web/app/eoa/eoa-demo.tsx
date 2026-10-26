@@ -1622,7 +1622,6 @@ function Reveal({
           {pull.draws.map((draw) => {
             const offer = offerFor(offers, draw.settlementId);
             const decision = decisions[draw.settlementId];
-            const c = draw.collectible;
             const price = offer ? offerPrice(offer, now) : null;
             const amount = price?.sellable
               ? price.tier?.amountInUsdt
@@ -1636,10 +1635,10 @@ function Reveal({
                   width={200}
                   height={260}
                   className={styles.revealImg}
-                  src={c.frontImageUrl}
-                  alt={c.name}
+                  src={draw.frontImageUrl}
+                  alt={draw.name}
                 />
-                <div style={{ fontWeight: 600 }}>{c.name}</div>
+                <div style={{ fontWeight: 600 }}>{draw.name}</div>
                 <span className={styles.chip}>
                   <span className={styles.chipKey}>Buyback base value</span>$
                   {usd(draw.buybackBaseValueInUSD)}

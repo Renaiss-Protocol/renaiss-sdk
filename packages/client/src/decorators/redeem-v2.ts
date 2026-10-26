@@ -81,7 +81,7 @@ export type RedemptionActions = {
   syncRedemptionTracking(
     request: RedemptionOrderRequest,
   ): Promise<Result<RedemptionOrder>>;
-  /** Page through the cards this wallet can redeem. Optional `search`, `countryCode`, `sortBy` (`RedemptionCardSort`), `sortOrder` (`RedemptionSortOrder`) and `pageSize` (1 to 50, default 50). Each card has `tokenId`, `name`, `frontImageUrl`, `fmvInUsd`, `fmvUpdatedAt`, `ownerAcquiredAt`, `regionCountryCode` and `vaultDisplayName`; pages carry `totalCount` and `hasMore`. Requires a wallet access token. Paginated; Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, UNKNOWN_ERROR, REDEMPTION_V2_REQUEST_FAILED, REDEMPTION_SESSION_REQUIRED. Narrow with isListRedeemableCardsError. @throws Never; errors are Result values. */
+  /** Page through the cards this wallet can redeem. Optional `search`, `countryCode`, `sortBy` (`RedemptionCardSort`), `sortOrder` (`RedemptionSortOrder`) and `pageSize` (1 to 50, default 50). Each card has `tokenId`, `name`, `frontImageUrl`, `rixPriceInUsd`, `rixPriceUpdatedAt`, `ownerAcquiredAt`, `regionCountryCode` and `vaultDisplayName`; pages carry `totalCount` and `hasMore`. Requires a wallet access token. Paginated; Result failures: WRONG_REQUEST_PARAMS, INVALID_SCHEMA, UNKNOWN_ERROR, REDEMPTION_V2_REQUEST_FAILED, REDEMPTION_SESSION_REQUIRED. Narrow with isListRedeemableCardsError. @throws Never; errors are Result values. */
   listRedeemableCards(
     request?: ListRedeemableCardsRequest,
   ): Paginated<RedeemableCard[]>;

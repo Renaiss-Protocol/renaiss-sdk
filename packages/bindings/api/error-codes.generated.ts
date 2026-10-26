@@ -77,7 +77,11 @@ export const V2_GACHA_DRAW_STATUS_GET_CODES = [
 export const V2_GACHA_PACKS_BY_SLUG_CONTENT_GET_CODES = [
   'WRONG_REQUEST_PARAMS',
   'INVALID_SCHEMA',
+  'API_AUTH_INVALID_CREDENTIAL',
+  'API_AUTH_CREDENTIAL_NOT_ALLOWED',
+  'GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API',
   'CARD_PACK_NOT_FOUND',
+  'API_AUTH_RATE_LIMITED',
   'SUBGRAPH_RATE_LIMITED',
 ] as const;
 
@@ -85,7 +89,11 @@ export const V2_GACHA_PACKS_BY_SLUG_CONTENT_GET_CODES = [
 export const V2_GACHA_PACKS_BY_SLUG_GET_CODES = [
   'WRONG_REQUEST_PARAMS',
   'INVALID_SCHEMA',
+  'API_AUTH_INVALID_CREDENTIAL',
+  'API_AUTH_CREDENTIAL_NOT_ALLOWED',
+  'GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API',
   'CARD_PACK_NOT_FOUND',
+  'API_AUTH_RATE_LIMITED',
   'SUBGRAPH_RATE_LIMITED',
 ] as const;
 
@@ -93,14 +101,21 @@ export const V2_GACHA_PACKS_BY_SLUG_GET_CODES = [
 export const V2_GACHA_PACKS_BY_SLUG_PULL_HISTORY_GET_CODES = [
   'WRONG_REQUEST_PARAMS',
   'INVALID_SCHEMA',
+  'API_AUTH_INVALID_CREDENTIAL',
+  'API_AUTH_CREDENTIAL_NOT_ALLOWED',
+  'GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API',
   'CARD_PACK_NOT_FOUND',
-  'SUBGRAPH_RATE_LIMITED',
+  'API_AUTH_RATE_LIMITED',
 ] as const;
 
 /** Error codes for `GET /v2/gacha/packs`. */
 export const V2_GACHA_PACKS_GET_CODES = [
   'WRONG_REQUEST_PARAMS',
   'INVALID_SCHEMA',
+  'API_AUTH_INVALID_CREDENTIAL',
+  'API_AUTH_CREDENTIAL_NOT_ALLOWED',
+  'GACHA_V3_BUILDER_NOT_ACCEPTED_ON_PUBLIC_API',
+  'API_AUTH_RATE_LIMITED',
 ] as const;
 
 /** Error codes for `GET /v2/gacha/pull-history`. */
@@ -524,6 +539,7 @@ export const GENERATED_ERROR_CODES = [
   'MATCHING_BID_PERMIT_NOT_FOUND',
   'OFFER_EXPIRY_TOO_LONG',
   'OFFER_NOT_FOUND',
+  'OP_WALLET_BUSY',
   'ORDER_NOT_FOUND',
   'PERMIT2_NONCE_ALREADY_USED',
   'PERMIT_EXPIRED',
@@ -595,6 +611,7 @@ export const GENERATED_ERROR_MESSAGES = {
   MATCHING_BID_PERMIT_NOT_FOUND: "The bid cannot be accepted. Read the bids again; do not retry this request.",
   OFFER_EXPIRY_TOO_LONG: "Something went wrong.",
   OFFER_NOT_FOUND: "The bid does not exist. Read the bids again; do not retry this request.",
+  OP_WALLET_BUSY: "Something went wrong.",
   ORDER_NOT_FOUND: "Something went wrong.",
   PERMIT_EXPIRED: "The signed pull expired before it was sent, so no payment was made. You can prepare a new pull and sign it again.",
   PERMIT2_NONCE_ALREADY_USED: "Something went wrong.",

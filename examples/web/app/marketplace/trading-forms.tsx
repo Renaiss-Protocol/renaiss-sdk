@@ -97,10 +97,10 @@ function DialogCard({ card }: { card: CardDetail }) {
           </div>
           <div className={styles.metaLine2}>{secondRow}</div>
         </div>
-        {card.fmvInUsd !== null ? (
+        {card.rixPriceInUsd !== null ? (
           <FmvBadge
-            cents={card.fmvInUsd}
-            updatedAt={card.fmvUpdatedAt}
+            cents={card.rixPriceInUsd}
+            updatedAt={card.rixPriceUpdatedAt}
             size='large'
           />
         ) : (
@@ -639,7 +639,8 @@ export function AcceptOfferDialog({
   const amount = BigInt(bid.amountInUsdt);
   const receive = (amount * BPS) / (BPS + feeBps);
   const fee = amount - receive;
-  const fmvUsdt = card.fmvInUsd === null ? null : usdToUsdt(card.fmvInUsd);
+  const fmvUsdt =
+    card.rixPriceInUsd === null ? null : usdToUsdt(card.rixPriceInUsd);
   const belowFmv = fmvUsdt !== null && amount * 10n < fmvUsdt * 8n;
   return (
     <Dialog
@@ -684,10 +685,10 @@ export function AcceptOfferDialog({
           <span>You will receive</span>
           <span>$ {usdt(receive, 2)}</span>
         </div>
-        {card.fmvInUsd !== null && (
+        {card.rixPriceInUsd !== null && (
           <div className={styles.breakdownRow}>
             <span>FMV</span>
-            <span>$ {usd(card.fmvInUsd, 2)}</span>
+            <span>$ {usd(card.rixPriceInUsd, 2)}</span>
           </div>
         )}
       </div>

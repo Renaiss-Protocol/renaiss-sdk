@@ -49,12 +49,13 @@ describe('v2 error codes', () => {
 
   it('keeps the content route codes in sync with its documented 4xx responses', () => {
     // The 500 and 502 responses of this route type `code` as a plain string, so
-    // only the documented 4xx responses carry literal codes to compare.
+    // only the documented 4xx responses carry literal codes to compare. 401
+    // and 403 answer an optional builder key that the API does not accept.
     type Documented =
       ApiJsonResponse<
         '/v2/gacha/packs/{slug}/content',
         'get',
-        400 | 404 | 429
+        400 | 401 | 403 | 404 | 429
       > extends { code: infer Code }
         ? Code
         : never;

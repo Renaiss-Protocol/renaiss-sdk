@@ -55,7 +55,7 @@ fail locally before any request. Omit a range to browse all values.
 
 USDT values are strings of 18-decimal base units. USD values are integer cents.
 Keep them as `bigint` for arithmetic; never convert balances/prices through
-`Number`. Missing ask/FMV prices normalize to `null`.
+`Number`. Missing ask and RIX prices normalize to `null`.
 
 ## Trading
 

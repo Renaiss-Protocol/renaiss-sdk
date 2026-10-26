@@ -134,10 +134,10 @@ export function CardDetailView({
                   ? `$ ${usdt(detail.askPriceInUsdt, 18)}`
                   : 'Unlisted'}
               </span>
-              {detail.fmvInUsd !== null && (
+              {detail.rixPriceInUsd !== null && (
                 <FmvBadge
-                  cents={detail.fmvInUsd}
-                  updatedAt={detail.fmvUpdatedAt}
+                  cents={detail.rixPriceInUsd}
+                  updatedAt={detail.rixPriceUpdatedAt}
                 />
               )}
             </div>
