@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "with-env": "dotenv -e ../../.env.local -e ../../.env --",
-    "dev": "pnpm with-env next dev",
+    "dev": "pnpm --filter \"web^...\" build && pnpm with-env next dev",
     "start": "pnpm with-env next start",
     "build": "pnpm with-env next build",
     "typecheck": "tsc --noEmit"
