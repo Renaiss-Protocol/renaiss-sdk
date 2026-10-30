@@ -475,7 +475,7 @@ const idsSchema = z
   .max(50)
   .refine((ids) => new Set(ids).size === ids.length);
 export enum RedemptionCardSort {
-  Fmv = 'fmv',
+  RixPrice = 'rixPriceInUsd',
   CreatedAt = 'createdAt',
 }
 export enum RedemptionSortOrder {
@@ -513,7 +513,7 @@ export function listRedeemableCards(
       const result = await privateResponse(
         ctx,
         RedeemableCardsResponseSchema,
-        ctx.service.get('/v2/redeem/cards', {
+        ctx.service.get('/v2/redeem/collectibles', {
           ...(await credentials(ctx)),
           query: { ...query, page: offset / pageSize + 1, limit: pageSize },
         }),
@@ -525,7 +525,7 @@ export function listRedeemableCards(
           422,
         );
       return {
-        items: result.cards,
+        items: result.collectibles,
         totalCount: result.total,
         hasMore: result.hasMore,
         nextCursor: result.hasMore

@@ -48,12 +48,12 @@ export const coverage: EndpointCoverage[] = [
         use: '"Listed" pill, "$ 175.44" / "unlisted", hover button label (Buy now vs Make an offer)',
       },
       {
-        field: 'collection[].fmvPriceInUSD',
+        field: 'collection[].rixPriceInUsd',
         status: 'shown',
-        use: 'Gold "FMV $ 172" badge (hidden when NO-FMV-PRICE)',
+        use: 'Gold "FMV $ 172" badge (hidden when NO-RIX-PRICE)',
       },
       {
-        field: 'collection[].fmvUpdatedAt',
+        field: 'collection[].rixPriceUpdatedAt',
         status: 'shown',
         use: 'FMV badge hover: "Fair market value · Priced 2 weeks ago"',
       },
@@ -78,7 +78,7 @@ export const coverage: EndpointCoverage[] = [
   },
   {
     id: 'detail',
-    endpoint: 'GET /v2/marketplace/cards/{tokenId}',
+    endpoint: 'GET /v2/marketplace/collectibles/{tokenId}',
     sdk: 'fetchCard()',
     fields: [
       {
@@ -92,34 +92,19 @@ export const coverage: EndpointCoverage[] = [
         use: 'Image alt, dialog card info; the header uses the parts below instead',
       },
       {
-        field: 'collectible.gradingCompany',
+        field: 'collectible.type',
         status: 'shown',
-        use: 'Header row 1 "PSA 8 NM-MT"; Card Details "Grader"',
+        use: 'Card Details "Type" row (e.g. POKEMON)',
       },
       {
-        field: 'collectible.grade',
+        field: 'collectible.attributes[].key',
         status: 'shown',
-        use: 'Header row 1; Card Details "Grade"',
+        use: 'Card Details row labels, in API order; header rows read Grader, Grade, Year, Set, Card Number and Character by key',
       },
       {
-        field: 'collectible.year',
+        field: 'collectible.attributes[].value',
         status: 'shown',
-        use: 'Header row 1; Card Details "Year"',
-      },
-      {
-        field: 'collectible.setName',
-        status: 'shown',
-        use: 'Header row 1; Card Details "Set"',
-      },
-      {
-        field: 'collectible.cardNumber',
-        status: 'shown',
-        use: 'Header row 2 "#number …"; Card Details "Card Number"',
-      },
-      {
-        field: 'collectible.pokemonName',
-        status: 'shown',
-        use: 'Header row 2 "… name"',
+        use: 'Header row 1 (grader + grade, year, set) and row 2 ("#number character"); Card Details row values',
       },
       {
         field: 'collectible.ownerAddress',
@@ -147,12 +132,12 @@ export const coverage: EndpointCoverage[] = [
         use: 'Listing expiry in the Edit listing form',
       },
       {
-        field: 'collectible.fmvPriceInUSD',
+        field: 'collectible.rixPriceInUsd',
         status: 'shown',
         use: '"FMV $ 172" pill in the header and in every dialog; 80%-of-FMV warning when accepting an offer',
       },
       {
-        field: 'collectible.fmvUpdatedAt',
+        field: 'collectible.rixPriceUpdatedAt',
         status: 'shown',
         use: 'FMV pill hover "Priced … ago"',
       },
@@ -165,16 +150,6 @@ export const coverage: EndpointCoverage[] = [
         field: 'collectible.backImageUrl',
         status: 'shown',
         use: 'Second carousel slide + thumbnail',
-      },
-      {
-        field: 'collectible.frontWithoutStandImageUrl',
-        status: 'unused',
-        use: 'Not displayed',
-      },
-      {
-        field: 'collectible.attributes[]',
-        status: 'shown',
-        use: '"Card Details" rows Serial and Language. Grader, Grade, Year, Set and Card Number come from the fields above',
       },
       {
         field: 'pricing.top_offer',
@@ -195,7 +170,7 @@ export const coverage: EndpointCoverage[] = [
   },
   {
     id: 'orders',
-    endpoint: 'GET /v2/marketplace/cards/{tokenId}/orders',
+    endpoint: 'GET /v2/marketplace/collectibles/{tokenId}/orders',
     sdk: 'fetchCardOrders()',
     fields: [
       { field: 'tokenId', status: 'sdk', use: 'Echo of the path parameter' },

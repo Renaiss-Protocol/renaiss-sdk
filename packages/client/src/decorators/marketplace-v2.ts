@@ -52,7 +52,7 @@ export type EoaMarketplaceActions = {
   listMarketplaceCards(
     request?: ListMarketplaceCardsV2Request,
   ): Paginated<MarketplaceCardV2[]>;
-  /** Read a visible card, images and price history. Returns WRONG_REQUEST_PARAMS, INVALID_SCHEMA, MARKETPLACE_V2_REQUEST_FAILED or UNKNOWN_ERROR as values. */
+  /** Read a visible collectible: its `type`, images, `attributes` (key and value pairs such as Grader, Grade and Year) and price history. Returns WRONG_REQUEST_PARAMS, INVALID_SCHEMA, MARKETPLACE_V2_REQUEST_FAILED or UNKNOWN_ERROR as values. */
   fetchCard(request: MarketplaceCardV2Request): Promise<Result<CardDetailV2>>;
   /** Read the active ask and funded bids. Returns WRONG_REQUEST_PARAMS, INVALID_SCHEMA, MARKETPLACE_V2_REQUEST_FAILED or UNKNOWN_ERROR as values. */
   fetchCardOrders(

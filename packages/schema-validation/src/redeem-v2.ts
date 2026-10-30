@@ -32,15 +32,15 @@ const RedeemableCardSchema = z.object({
   tokenId: RedemptionUintSchema,
   name: z.string(),
   frontImageUrl: z.url(),
-  fmvPriceInUsd: RedemptionUintSchema.nullable(),
-  fmvUpdatedAt: z.iso.datetime().nullable(),
+  rixPriceInUsd: RedemptionUintSchema.nullable(),
+  rixPriceUpdatedAt: z.iso.datetime().nullable(),
   ownerAcquiredAt: z.iso.datetime().nullable(),
   regionCountryCode: z.string(),
   vaultDisplayName: z.string(),
 });
 export type RedeemableCard = z.infer<typeof RedeemableCardSchema>;
 export const RedeemableCardsResponseSchema = z.object({
-  cards: z.array(RedeemableCardSchema),
+  collectibles: z.array(RedeemableCardSchema),
   total: z.number().int().nonnegative(),
   page: z.number().int().positive(),
   hasMore: z.boolean(),
@@ -129,7 +129,7 @@ export const RedemptionOrderSchema = z.object({
   trackingLastSyncedAt: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime().nullable(),
-  cards: z.array(RedeemableCardSchema.omit({ ownerAcquiredAt: true })),
+  collectibles: z.array(RedeemableCardSchema.omit({ ownerAcquiredAt: true })),
 });
 export type RedemptionOrder = z.infer<typeof RedemptionOrderSchema>;
 const RedemptionOrderSummarySchema = RedemptionOrderSchema.pick({
@@ -138,12 +138,12 @@ const RedemptionOrderSummarySchema = RedemptionOrderSchema.pick({
   trackingNumber: true,
   shipmentStatus: true,
 }).extend({
-  cards: z.array(
+  collectibles: z.array(
     RedeemableCardSchema.pick({
       tokenId: true,
       name: true,
       frontImageUrl: true,
-      fmvPriceInUsd: true,
+      rixPriceInUsd: true,
     }),
   ),
 });

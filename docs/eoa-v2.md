@@ -88,10 +88,17 @@ approval an explicit step, following [viem's typed-data signing interface](https
   as soon as received. Recovery uses `fetchGachaDrawStatus` and `listWalletPulls`.
   An empty history is not evidence that payment failed. A fresh nonce creates
   another purchase; never automatically retry a funding request.
-- Buybacks take 1–10 unique, unexpired offers from the same pack and contract.
-  Pass the chain and token from known deployment configuration or a previous
-  preparation, then `createGachaBuyback` and `submitGachaBuyback`. No NFT approval
-  is required. Offer expiry/delivery can race; refresh after a failed settlement.
+- Buybacks take 1–10 unique offers from the same pack and contract. Each offer
+  lists its `buybackTiers`, soonest end first; the price now is the
+  `amountInUsdt` of the first tier whose `expiresAt` has not passed.
+  `currentBuybackTier(offer)` returns that tier for display, and
+  `createGachaBuyback` signs the sum of those prices at signing time. An offer
+  whose current tier pays 0 is on hold and cannot be signed. Pass the chain and
+  token from known deployment configuration or a previous preparation, then
+  `createGachaBuyback` and `submitGachaBuyback`. No NFT approval is required.
+  Submit right after signing: if a tier ends first, the submission fails with
+  status 409 (`GACHA_V3_BUYBACK_PRICE_CHANGED` in `ApiError.error`). Read the
+  offers again and sign the new amount after any failed settlement.
 
 
 ## Interrupted purchases

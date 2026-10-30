@@ -10,6 +10,7 @@ import {
   PaginationResponseSchema,
   PreparedGachaPullPayloadSchema,
 } from './gacha';
+import { CollectibleAttributeSchema } from './marketplace';
 import {
   addressSchema,
   bytes32Schema,
@@ -25,7 +26,6 @@ const EoaMachineSchema = z.object({
   stage: z.enum(GachaMachineStage),
   priceInUsdt: numericStringSchema,
   expectedValueInUsd: numericStringSchema.nullable(),
-  featuredCardFmvInUsd: numericStringSchema.nullable(),
   // Needed to build a pull payload. Non-nullable: the API rejects a v3 pack
   // row missing either identifier, so a half-configured machine cannot exist.
   onChainPackId: bytes32Schema,
@@ -42,11 +42,20 @@ const EoaMachineTierSchema = GachaMachineTierSchema.extend({
   }),
 });
 export type EoaMachineTier = z.infer<typeof EoaMachineTierSchema>;
+/**
+ * One buyback tier of a machine: until `buybackExpiredInSeconds` after a pull
+ * resolves, a buyback pays `buybackPercentage` of the collectible's base value.
+ * A pull keeps the tiers the machine had when it was drawn.
+ */
+const EoaMachineBuybackTierSchema = z.object({
+  buybackPercentage: z.number(),
+  buybackExpiredInSeconds: z.number().int().nonnegative(),
+});
+export type EoaMachineBuybackTier = z.infer<typeof EoaMachineBuybackTierSchema>;
 const EoaMachineDetailSchema = EoaMachineSchema.extend({
   tiers: z.array(EoaMachineTierSchema),
   activeSetExpectedValueInUsd: numericStringSchema,
-  buybackPercentage: z.number().nullable(),
-  buybackWindowSeconds: z.number().int().nonnegative(),
+  buybackConfig: z.array(EoaMachineBuybackTierSchema),
 });
 const EoaMachineContentSchema = z.object({
   name: z.string(),
@@ -62,7 +71,7 @@ export const EoaMachineResponseSchema = z.object({
   cardPack: EoaMachineDetailSchema,
 });
 export const EoaContentsResponseSchema = z.object({
-  cards: z.array(EoaMachineContentSchema),
+  collectibles: z.array(EoaMachineContentSchema),
   pagination: PaginationResponseSchema,
 });
 export const EoaPublicHistoryResponseSchema = z.object({
@@ -113,18 +122,18 @@ export const EoaPullSchema = z.object({
   pulledAt: z.string().datetime().nullable(),
   draws: z.array(EoaDrawSchema),
 });
-const EoaResolvedPullSchema = EoaPullSchema.extend({
-  status: z.literal('RESOLVED'),
+/** A resolved pull from the stream: no status, and each draw names its collectible. */
+const EoaResolvedPullSchema = EoaPullSchema.omit({ status: true }).extend({
   draws: z.array(
     EoaDrawSchema.extend({
-      collectible: z.object({
-        name: z.string(),
-        frontImageUrl: z.string().url(),
-        imageUrl: z.string().url(),
-        tier: z.string(),
-        buybackBaseValueInUSD: numericStringSchema,
-        snapshotBuybackValueInUsdt: numericStringSchema.nullable(),
-      }),
+      tier: z.string(),
+      buybackBaseValueInUSD: numericStringSchema,
+      // A plain string: the API adds collectible types (POKEMON, ONE_PIECE,
+      // SPORTS today) without a new SDK release.
+      type: z.string(),
+      name: z.string(),
+      frontImageUrl: z.string().url(),
+      attributes: z.array(CollectibleAttributeSchema),
     }),
   ),
 });
@@ -163,13 +172,22 @@ export const EoaHistoryResponseSchema = z.object({
   offset: z.number(),
   hasMore: z.boolean(),
 });
+/**
+ * One price step of a buyback offer: `amountInUsdt` (18-decimal base units)
+ * applies until `expiresAt`, inclusive.
+ */
+const EoaBuybackTierSchema = z.object({
+  buybackPercentage: z.number(),
+  amountInUsdt: numericStringSchema,
+  expiresAt: z.string().datetime(),
+});
+export type EoaBuybackTier = z.infer<typeof EoaBuybackTierSchema>;
 export const EoaBuybackOfferSchema = z.object({
   cardPackId: z.string().uuid(),
   settlementId: bytes32Schema,
   tokenId: numericStringSchema,
-  amountInUsdt: numericStringSchema,
-  expiresAt: z.string().datetime(),
   vendingMachineAddress: addressSchema,
+  buybackTiers: z.array(EoaBuybackTierSchema),
 });
 export const EoaOffersResponseSchema = z.object({
   offers: z.array(EoaBuybackOfferSchema),

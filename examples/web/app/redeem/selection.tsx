@@ -151,7 +151,7 @@ function Selection() {
             .listRedeemableCards({
               search: debounced || undefined,
               countryCode: region === 'all' ? undefined : region,
-              sortBy: RedemptionCardSort.Fmv,
+              sortBy: RedemptionCardSort.RixPrice,
               sortOrder:
                 sort === 'fmv-desc'
                   ? RedemptionSortOrder.Descending
@@ -168,7 +168,7 @@ function Selection() {
           hasMore: result.hasMore,
           nextCursor: result.nextCursor,
         });
-        record('GET /v2/redeem/cards', result);
+        record('GET /v2/redeem/collectibles', result);
       },
       fail: (e) => setListError(e instanceof Error ? e.message : String(e)),
       settle: () => setLoading(false),
@@ -474,8 +474,8 @@ function Selection() {
                         </td>
                         <td>
                           <FmvBadge
-                            cents={card.fmvPriceInUsd}
-                            updatedAt={card.fmvUpdatedAt}
+                            cents={card.rixPriceInUsd}
+                            updatedAt={card.rixPriceUpdatedAt}
                           />
                         </td>
                         <td>
@@ -634,7 +634,10 @@ function GridTile({
         />
         <span className={styles.vaultLabel}>{label}</span>
         <div className={styles.tileOverlay}>
-          <FmvBadge cents={card.fmvPriceInUsd} updatedAt={card.fmvUpdatedAt} />
+          <FmvBadge
+            cents={card.rixPriceInUsd}
+            updatedAt={card.rixPriceUpdatedAt}
+          />
           <button
             type='button'
             className={
@@ -651,7 +654,10 @@ function GridTile({
       <div className={styles.tileBody}>
         <CardName name={card.name} />
         <div className={styles.tileFooter}>
-          <FmvBadge cents={card.fmvPriceInUsd} updatedAt={card.fmvUpdatedAt} />
+          <FmvBadge
+            cents={card.rixPriceInUsd}
+            updatedAt={card.rixPriceUpdatedAt}
+          />
           <button
             type='button'
             className={`${styles.btn} ${styles.btnSmall} ${styles.tileMobileCta}`}

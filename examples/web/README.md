@@ -10,14 +10,17 @@ From the repository root:
 
 ```bash
 pnpm install
-pnpm --filter @renaiss-protocol/client... build
 cp .env.example .env.local
 # Select the network, matching API URL and server builder key.
 pnpm --filter web dev --hostname 127.0.0.1 --port 3100
 ```
 
+The `dev` script builds the SDK packages the demo depends on before it starts,
+because the demo imports their built `dist` output. After changing SDK code,
+restart it to pick up the change.
+
 Open http://127.0.0.1:3100. The page shows the machine list (badge, status,
-price, EV, featured card value or catalog maximum, instant buyback, top tier range), a
+price, EV, catalog maximum, instant buyback, top tier range), a
 detail view (pull-history ticker, machine media, price and set EV, quantity
 stepper, rip button, pack info, tier pills, card grid) and the rip flow (no
 confirmation dialog; the button label cycles through the stream stages; the

@@ -41,16 +41,16 @@ The sections below describe the message and its timers.
 
 `listRedeemableCards` pages through the cards this wallet can redeem. All
 parameters are optional: `search` (text up to 200 characters), `countryCode`
-(two uppercase letters), `sortBy` (`RedemptionCardSort.Fmv` or `.CreatedAt`),
+(two uppercase letters), `sortBy` (`RedemptionCardSort.RixPrice` or `.CreatedAt`),
 `sortOrder` (`RedemptionSortOrder.Ascending` or `.Descending`) and `pageSize`
 (1 to 50, default 50). Each card has `tokenId`, `name`, `frontImageUrl`,
-`fmvPriceInUsd`, `fmvUpdatedAt` and `ownerAcquiredAt` (each can be `null`),
+`rixPriceInUsd`, `rixPriceUpdatedAt` and `ownerAcquiredAt` (each can be `null`),
 `regionCountryCode` and `vaultDisplayName`. Pages carry `totalCount` and
 `hasMore`.
 
 ```ts
 const cards = client.listRedeemableCards({
-  sortBy: RedemptionCardSort.Fmv,
+  sortBy: RedemptionCardSort.RixPrice,
   sortOrder: RedemptionSortOrder.Descending,
 });
 ```
@@ -116,7 +116,7 @@ from an interrupted or uncertain submission.
 `listRedemptionOrders({ pageSize? })` pages through this builder's orders for the
 wallet. `pageSize` is 1 to 20 and defaults to 10. Pages report `hasMore` but no
 total. Each entry has `requestId`, `status`, `trackingNumber`, `shipmentStatus`
-and a short card list (`tokenId`, `name`, `frontImageUrl`, `fmvPriceInUsd`). A
+and a short `collectibles` list (`tokenId`, `name`, `frontImageUrl`, `rixPriceInUsd`). A
 newly submitted order may not appear until it is indexed; keep using
 `fetchRedemptionCheckout` until it does.
 

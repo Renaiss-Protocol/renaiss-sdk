@@ -2,8 +2,11 @@
 
 import {
   createGachaClient,
+  currentBuybackTier,
   type EoaBuybackOffer,
+  type EoaBuybackTier,
   type EoaMachine,
+  type EoaMachineBuybackTier,
   type EoaMachineContent,
   type EoaMachineDetail,
   type EoaMachineTier,
@@ -50,7 +53,6 @@ import {
   tierLabel,
   tierRange,
   usd,
-  usdToUsdt,
   usdt,
   windowLabel,
 } from './format';
@@ -109,17 +111,28 @@ function injected() {
 function tiersHighestFirst(machine: EoaMachineDetail): Tier[] {
   return [...machine.tiers].sort((a, b) => b.tier - a.tier);
 }
-/** A featured card's value when the machine has one, else the catalog maximum. */
+/** The highest price in the machine's catalog. */
 function topPrize(machine: EoaMachineDetail) {
-  if (machine.featuredCardFmvInUsd !== null)
-    return {
-      label: 'Featured card value',
-      value: machine.featuredCardFmvInUsd,
-    };
   const highest = tiersHighestFirst(machine)[0];
   return highest
     ? { label: 'Catalog max', value: highest.priceRangeInUsd.max }
     : null;
+}
+/** The headline "Instant buyback" percentage: the best tier, or null without buyback. */
+function headlineBuybackPercentage(
+  config: EoaMachineBuybackTier[],
+): number | null {
+  if (config.length === 0) return null;
+  return Math.max(...config.map((tier) => tier.buybackPercentage));
+}
+/** How long a new pull can be sold back: the latest tier end, or null without buyback. */
+function buybackWindowSeconds(config: EoaMachineBuybackTier[]): number | null {
+  if (config.length === 0) return null;
+  return Math.max(...config.map((tier) => tier.buybackExpiredInSeconds));
+}
+function buybackPercentageText(config: EoaMachineBuybackTier[]) {
+  const percentage = headlineBuybackPercentage(config);
+  return percentage === null ? 'None' : `${percentage}%`;
 }
 function stageText(event: EoaStreamEvent) {
   switch (event.event) {
@@ -881,7 +894,7 @@ export function EoaDemo() {
             <div className={styles.ticker}>
               <span
                 className={styles.tickerLabel}
-                title={`Pulls appear here after their buyback offer period (${windowLabel(machine.buybackWindowSeconds)}) has expired.`}
+                title={pullFeedHint(machine.buybackConfig)}
               >
                 Pull history ⓘ
               </span>
@@ -989,11 +1002,7 @@ export function EoaDemo() {
                     <div className={styles.statCell}>
                       <div className={styles.statLabel}>Instant buyback</div>
                       <div className={styles.statValue}>
-                        {machine.buybackPercentage === null ? (
-                          <span className={styles.missing}>null</span>
-                        ) : (
-                          `${machine.buybackPercentage}%`
-                        )}
+                        {buybackPercentageText(machine.buybackConfig)}
                       </div>
                     </div>
                   </div>
@@ -1330,11 +1339,7 @@ function MachineCard({
           <div className={styles.statLabel}>Instant buyback</div>
           <div className={styles.statValue}>
             {detail ? (
-              detail.buybackPercentage === null ? (
-                <span className={styles.missing}>null</span>
-              ) : (
-                `${detail.buybackPercentage}%`
-              )
+              buybackPercentageText(detail.buybackConfig)
             ) : (
               <span className={styles.missing}>…</span>
             )}
@@ -1515,6 +1520,51 @@ function offerFor(offers: EoaBuybackOffer[], settlementId: string) {
   );
 }
 
+function pullFeedHint(config: EoaMachineBuybackTier[]) {
+  const seconds = buybackWindowSeconds(config);
+  return seconds === null
+    ? 'Recent pulls from this machine.'
+    : `Pulls appear here after their buyback offer period (${windowLabel(seconds)}) has expired.`;
+}
+
+type OfferPrice = {
+  /** The tier pricing the offer now; undefined once the offer has ended. */
+  tier: EoaBuybackTier | undefined;
+  /** True when the offer can be sold back now (a positive current price). */
+  sellable: boolean;
+  /** Countdown line: price change, hold or offer end. */
+  status: string;
+};
+
+/**
+ * Prices an offer at `now` with `currentBuybackTier`. The offer as a whole ends
+ * at the last tier with a positive amount; a tier with amount 0 is a hold.
+ */
+function offerPrice(offer: EoaBuybackOffer, now: number): OfferPrice {
+  const tier = currentBuybackTier(offer, new Date(now));
+  const ends = offer.buybackTiers
+    .filter((t) => BigInt(t.amountInUsdt) > 0n)
+    .map((t) => Date.parse(t.expiresAt));
+  const offerEnd = ends.length > 0 ? Math.max(...ends) : null;
+  if (!tier || offerEnd === null || offerEnd < now)
+    return { tier: undefined, sellable: false, status: 'Offer expired' };
+  const tierEnd = Date.parse(tier.expiresAt);
+  if (BigInt(tier.amountInUsdt) === 0n)
+    return {
+      tier,
+      sellable: false,
+      status: `On hold, sellable in ${countdown(tierEnd, now)}`,
+    };
+  return {
+    tier,
+    sellable: true,
+    status:
+      tierEnd >= offerEnd
+        ? `Offer expires in ${countdown(offerEnd, now)}`
+        : `${tier.buybackPercentage}% price ends in ${countdown(tierEnd, now)}`,
+  };
+}
+
 function Reveal({
   pull,
   machine,
@@ -1542,11 +1592,12 @@ function Reveal({
   const undecided = pull.draws.filter((d) => !decisions[d.settlementId]);
   const sellable = undecided
     .map((d) => offerFor(offers, d.settlementId))
-    .filter((o): o is EoaBuybackOffer => !!o && Date.parse(o.expiresAt) > now);
+    .filter((o): o is EoaBuybackOffer => !!o && offerPrice(o, now).sellable);
   const sellAllTotal = sellable.reduce(
-    (sum, o) => sum + BigInt(o.amountInUsdt),
+    (sum, o) => sum + BigInt(offerPrice(o, now).tier?.amountInUsdt ?? '0'),
     0n,
   );
+  const windowSeconds = buybackWindowSeconds(machine.buybackConfig);
   return (
     <div className={styles.overlay}>
       <div className={styles.reveal} role='dialog' aria-label='Your new cards'>
@@ -1571,33 +1622,31 @@ function Reveal({
           {pull.draws.map((draw) => {
             const offer = offerFor(offers, draw.settlementId);
             const decision = decisions[draw.settlementId];
-            const c = draw.collectible;
-            const amount = offer?.amountInUsdt ?? c.snapshotBuybackValueInUsdt;
-            const base = usdToUsdt(c.buybackBaseValueInUSD);
-            const pct =
-              amount && base > 0n ? (BigInt(amount) * 100n) / base : null;
-            const expired = offer ? Date.parse(offer.expiresAt) <= now : false;
+            const price = offer ? offerPrice(offer, now) : null;
+            const amount = price?.sellable
+              ? price.tier?.amountInUsdt
+              : undefined;
             return (
               <div className={styles.revealCard} key={draw.settlementId}>
-                <div style={{ color: tierColor(c.tier), fontWeight: 600 }}>
-                  You got a {c.tier}-tier card!
+                <div style={{ color: tierColor(draw.tier), fontWeight: 600 }}>
+                  You got a {draw.tier}-tier card!
                 </div>
                 <Image
                   width={200}
                   height={260}
                   className={styles.revealImg}
-                  src={c.frontImageUrl}
-                  alt={c.name}
+                  src={draw.frontImageUrl}
+                  alt={draw.name}
                 />
-                <div style={{ fontWeight: 600 }}>{c.name}</div>
+                <div style={{ fontWeight: 600 }}>{draw.name}</div>
                 <span className={styles.chip}>
                   <span className={styles.chipKey}>Buyback base value</span>$
-                  {usd(c.buybackBaseValueInUSD)}
+                  {usd(draw.buybackBaseValueInUSD)}
                 </span>
                 <div className={styles.offerStrip}>
                   <span className={styles.muted}>
-                    {pct !== null
-                      ? `${pct}% Instant buyback`
+                    {price?.tier
+                      ? `${price.tier.buybackPercentage}% Instant buyback`
                       : 'Instant buyback'}
                   </span>
                   <span>{amount ? `$${usdt(amount)}` : 'N/A'}</span>
@@ -1607,9 +1656,7 @@ function Reveal({
                 </span>
                 {decision ? (
                   <span className={styles.decided}>
-                    {decision === 'sold'
-                      ? `Sold for $${amount ? usdt(amount) : '?'}`
-                      : 'Kept in collectibles'}
+                    {decision === 'sold' ? 'Sold back' : 'Kept in collectibles'}
                   </span>
                 ) : (
                   <>
@@ -1619,12 +1666,14 @@ function Reveal({
                           <button
                             type='button'
                             className={`${styles.btn} ${styles.btnSolid}`}
-                            disabled={busy || !offer || expired}
+                            disabled={busy || !offer || !price?.sellable}
                             onClick={() => offer && onSell([offer])}
                           >
-                            {offer
-                              ? `Accept for $${usdt(offer.amountInUsdt)}`
-                              : 'Offer pending…'}
+                            {amount
+                              ? `Accept for $${usdt(amount)}`
+                              : offer
+                                ? 'Accept'
+                                : 'Offer pending…'}
                           </button>
                           <button
                             type='button'
@@ -1648,22 +1697,24 @@ function Reveal({
                           <button
                             type='button'
                             className={`${styles.btn} ${styles.btnSolid}`}
-                            disabled={busy || !offer || expired}
+                            disabled={busy || !offer || !price?.sellable}
                             onClick={() => offer && onSell([offer])}
                           >
-                            {offer
-                              ? `Sell for $${usdt(offer.amountInUsdt)}`
-                              : 'Offer pending…'}
+                            {amount
+                              ? `Sell for $${usdt(amount)}`
+                              : offer
+                                ? 'Sell'
+                                : 'Offer pending…'}
                           </button>
                         </>
                       )}
                     </div>
                     <span className={`${styles.small} ${styles.muted}`}>
-                      {offer
-                        ? expired
-                          ? 'Offer expired'
-                          : `Offer expires in ${countdown(Date.parse(offer.expiresAt), now)}`
-                        : `Offer not listed yet (window ${windowLabel(machine.buybackWindowSeconds)})`}
+                      {price
+                        ? price.status
+                        : windowSeconds === null
+                          ? 'No instant buyback on this machine'
+                          : `Offer not listed yet (window ${windowLabel(windowSeconds)})`}
                     </span>
                   </>
                 )}
@@ -1781,7 +1832,10 @@ function YourPulls({
           </div>
           {pull.draws.map((draw) => {
             const offer = offerFor(offers, draw.settlementId);
-            const expired = offer ? Date.parse(offer.expiresAt) <= now : true;
+            const price = offer ? offerPrice(offer, now) : null;
+            const amount = price?.sellable
+              ? price.tier?.amountInUsdt
+              : undefined;
             return (
               <div className={styles.drawRow} key={draw.settlementId}>
                 <div className={styles.grow}>
@@ -1807,21 +1861,19 @@ function YourPulls({
                     Released ↗
                   </a>
                 )}
-                {offer && (
+                {offer && price && (
                   <>
                     <span className={`${styles.small} ${styles.muted}`}>
-                      {expired
-                        ? 'Offer expired'
-                        : `Offer expires in ${countdown(Date.parse(offer.expiresAt), now)}`}
+                      {price.status}
                     </span>
                     <button
                       type='button'
                       className={`${styles.btn} ${styles.btnSmall} ${styles.btnSolid}`}
-                      disabled={busy || !owns || expired}
+                      disabled={busy || !owns || !price.sellable}
                       title={owns ? undefined : 'Connect this wallet to accept'}
                       onClick={() => onSell(offer)}
                     >
-                      Accept for ${usdt(offer.amountInUsdt)}
+                      {amount ? `Accept for $${usdt(amount)}` : 'Accept'}
                     </button>
                   </>
                 )}

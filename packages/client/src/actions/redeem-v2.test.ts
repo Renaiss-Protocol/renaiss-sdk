@@ -14,7 +14,9 @@ import {
   BNB_MAINNET,
   BNB_TESTNET,
   createRedemptionClient,
+  RedemptionCardSort,
   type RedemptionClientOptions,
+  RedemptionSortOrder,
   type RenaissNetwork,
 } from '../index';
 import { privateKey } from '../viem';
@@ -54,14 +56,14 @@ const orderCard = {
   tokenId: '1',
   name: 'Test Card',
   frontImageUrl: 'https://img.example/1.png',
-  fmvPriceInUsd: '1000',
+  rixPriceInUsd: '1000',
 };
 const listedOrder = {
   requestId,
   status: 'Shipped',
   trackingNumber: 'TRK1',
   shipmentStatus: 'in transit',
-  cards: [orderCard],
+  collectibles: [orderCard],
 };
 const orderDetail = {
   ...listedOrder,
@@ -81,17 +83,18 @@ const orderDetail = {
   trackingLastSyncedAt: null,
   createdAt: '2026-10-01T00:00:00.000Z',
   updatedAt: null,
-  cards: [
+  collectibles: [
     {
       ...orderCard,
-      fmvUpdatedAt: null,
+      rixPriceUpdatedAt: null,
       regionCountryCode: 'US',
       vaultDisplayName: 'Test Vault',
     },
   ],
 };
-let requests: { path: string; init: RequestInit }[];
+let requests: { path: string; query: URLSearchParams; init: RequestInit }[];
 let listedOrderWire: Record<string, unknown>[];
+let listedCollectiblesWire: Record<string, unknown>[];
 let challengeOrigin: string;
 let challengeEdit: (s: string) => string;
 let challengeContext: unknown;
@@ -199,6 +202,7 @@ const expected = {
 beforeEach(() => {
   requests = [];
   listedOrderWire = [];
+  listedCollectiblesWire = [];
   challengeEdit = (s) => s;
   challengeContext = { ...shippingContext };
   challengeOrigin = origin;
@@ -209,7 +213,7 @@ beforeEach(() => {
     vi.fn(async (input: string, init: RequestInit = {}) => {
       const url = new URL(input);
       const path = url.pathname;
-      requests.push({ path, init });
+      requests.push({ path, query: url.searchParams, init });
       if (path === '/v2/auth/wallet/nonce') {
         const id = crypto.randomUUID();
         const expires = new Date(Date.now() + 300_000);
@@ -235,8 +239,13 @@ beforeEach(() => {
           scopes: ['redeem:read', 'redeem:write'],
         });
       if (path === '/v2/auth/wallet/revoke') return json({ revoked: true });
-      if (path === '/v2/redeem/cards')
-        return json({ cards: [], total: 0, page: 1, hasMore: false });
+      if (path === '/v2/redeem/collectibles')
+        return json({
+          collectibles: listedCollectiblesWire,
+          total: listedCollectiblesWire.length,
+          page: 1,
+          hasMore: false,
+        });
       if (path === '/v2/redeem/regions') return json({ counts: { US: 2 } });
       if (path === '/v2/redeem/orders')
         return json({
@@ -652,6 +661,36 @@ describe('wallet sessions', () => {
     expect(isFailed(await sdk.signInRedemptionWallet({ origin }))).toBe(true);
     expect(signIn).not.toHaveBeenCalled();
   });
+  it('sorts redeemable cards by RIX price and reads it as a bigint', async () => {
+    listedCollectiblesWire = [
+      {
+        tokenId: '1',
+        name: 'Test Card',
+        frontImageUrl: 'https://img.example/1.png',
+        rixPriceInUsd: '9007199254740993',
+        rixPriceUpdatedAt: null,
+        ownerAcquiredAt: null,
+        regionCountryCode: 'HK',
+        vaultDisplayName: 'Test Vault',
+      },
+    ];
+    const { sdk } = client();
+    expect(isSuccess(await sdk.signInRedemptionWallet({ origin }))).toBe(true);
+    const page = await sdk
+      .listRedeemableCards({
+        countryCode: 'HK',
+        sortBy: RedemptionCardSort.RixPrice,
+        sortOrder: RedemptionSortOrder.Descending,
+      })
+      .firstPage();
+    expect(isSuccess(page) && page.right.items[0]?.rixPriceInUsd).toBe(
+      9007199254740993n,
+    );
+    const query = requests.find((r) => r.path.endsWith('/collectibles'))?.query;
+    expect(query?.get('sortBy')).toBe('rixPriceInUsd');
+    expect(query?.get('sortOrder')).toBe('desc');
+    expect(query?.get('countryCode')).toBe('HK');
+  });
   it('signs the exact constrained SIWE message and forwards credentials only on private reads', async () => {
     const { sdk, signIn } = client();
     expect(isSuccess(await sdk.signInRedemptionWallet({ origin }))).toBe(true);
@@ -659,7 +698,7 @@ describe('wallet sessions', () => {
     expect(isSuccess(await sdk.listRedeemableCards().firstPage())).toBe(true);
     expect(requests.some((r) => r.path.endsWith('/config'))).toBe(false);
     const headers = new Headers(
-      requests.find((r) => r.path.endsWith('/cards'))?.init.headers,
+      requests.find((r) => r.path.endsWith('/collectibles'))?.init.headers,
     );
     expect(headers.get('authorization')).toBe('Bearer rnws_at_fixture');
     expect(headers.get('x-builder-api-key')).toBe('rnbldr_live_fixture');

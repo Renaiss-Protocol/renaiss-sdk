@@ -50,9 +50,11 @@ corepack install
 pnpm install
 cp .env.example .env.local
 # Set the API environment and server-only builder key in .env.local.
-pnpm build
 pnpm --filter web dev
 ```
+
+`pnpm --filter web dev` builds the SDK packages first, so the demo always uses
+the code you have checked out.
 
 Open http://localhost:3000. The demo defaults to BNB testnet. Set
 `NEXT_PUBLIC_RENAISS_NETWORK=mainnet` and matching API credentials to opt into

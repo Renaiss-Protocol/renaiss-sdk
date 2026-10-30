@@ -184,9 +184,9 @@ export function Tip({ children }: { children: ReactNode }) {
 }
 
 export function OrderCard({ order }: { order: RedemptionOrderSummary }) {
-  const shown = order.cards.slice(0, 3);
-  const extra = order.cards.length - shown.length;
-  const single = order.cards.length === 1;
+  const shown = order.collectibles.slice(0, 3);
+  const extra = order.collectibles.length - shown.length;
+  const single = order.collectibles.length === 1;
   return (
     <Link
       href={`/redeem/orders/${order.requestId}`}
@@ -226,9 +226,9 @@ export function OrderCard({ order }: { order: RedemptionOrderSummary }) {
         ))}
         {extra > 0 && (
           <div className={styles.orderImg}>
-            {order.cards[3] && (
+            {order.collectibles[3] && (
               <Image
-                src={order.cards[3].frontImageUrl}
+                src={order.collectibles[3].frontImageUrl}
                 alt=''
                 fill
                 sizes='(max-width: 760px) 25vw, 140px'
@@ -239,8 +239,8 @@ export function OrderCard({ order }: { order: RedemptionOrderSummary }) {
         )}
       </div>
       <div className={styles.orderFoot}>
-        <span className={styles.muted}>Items {order.cards.length}</span>
-        <FmvBadge cents={sumFmv(order.cards)} />
+        <span className={styles.muted}>Items {order.collectibles.length}</span>
+        <FmvBadge cents={sumFmv(order.collectibles)} />
       </div>
     </Link>
   );
@@ -383,7 +383,9 @@ export function DeliveryCard({
     <div className={styles.card}>
       <div className={styles.cardTitle}>Delivery</div>
       <div className={styles.radioRow} style={{ cursor: 'default' }}>
-        <CourierLogo name={courierName} logoUrl={logoUrl ?? null} />
+        {/* Orders carry only courierName; a logo comes from a quote. Without
+            one, the name in the line below identifies the courier. */}
+        {logoUrl ? <CourierLogo name={courierName} logoUrl={logoUrl} /> : null}
         <div className={styles.courierBody}>
           <span className={styles.muted}>Estimated delivery time</span>
           <span>{estimatedDays ?? '—'}</span>
