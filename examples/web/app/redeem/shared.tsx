@@ -383,7 +383,9 @@ export function DeliveryCard({
     <div className={styles.card}>
       <div className={styles.cardTitle}>Delivery</div>
       <div className={styles.radioRow} style={{ cursor: 'default' }}>
-        <CourierLogo name={courierName} logoUrl={logoUrl ?? null} />
+        {/* Orders carry only courierName; a logo comes from a quote. Without
+            one, the name in the line below identifies the courier. */}
+        {logoUrl ? <CourierLogo name={courierName} logoUrl={logoUrl} /> : null}
         <div className={styles.courierBody}>
           <span className={styles.muted}>Estimated delivery time</span>
           <span>{estimatedDays ?? '—'}</span>
