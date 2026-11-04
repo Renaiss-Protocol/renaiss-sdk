@@ -47,7 +47,7 @@
   "dependencies": {
     "fp-ts": "^2.16.9",
     "http-status-codes": "^2.3.0",
-    "zod": "^4.3.6"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@renaiss-protocol/bindings": "workspace:*",
