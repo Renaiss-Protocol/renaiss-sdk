@@ -5,3 +5,7 @@ packages:
 overrides:
   # next pins postcss 8.4.31 exactly (GHSA postcss <8.5.23); remove once next ships a patched postcss
   'next>postcss': ^8.5.23
+  # Require the patched image processor even when Next allows older sharp releases.
+  'next>sharp': ^0.35.5
+  # tsup 8 selects esbuild 0.27; require the Windows dev-server security fix.
+  'tsup>esbuild': ^0.28.2

@@ -24,6 +24,10 @@
 - The stream's `pull_started` event carries `requestId`, and a failed `submitGachaPull` returns it in `ApiError.error`, so you can recover with `fetchGachaPullStatus`.
 - `fetchGachaDrawStatus` returns `EoaDrawStatus`: each draw has `tier`, `buybackBaseValueInUSD` and `collectible`, or `null` when they could not be loaded. Draws also carry `buybackBonus` and `buybackTiers`. Buyback values and tier amounts already include the bonus: do not apply it again.
 
+### Security
+
+- Require Zod 4.6.6 or newer to address memory exhaustion when validating oversized constrained collections.
+
 ## 0.1.0-beta.4
 
 ### Patch Changes
