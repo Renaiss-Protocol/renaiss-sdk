@@ -425,10 +425,10 @@ function CardTile({
               ? 'unlisted'
               : `$ ${usdt(card.askPriceInUsdt, 2)}`}
           </span>
-          {card.fmvPriceInUsd !== null && (
+          {card.rixPriceInUsd !== null && (
             <FmvBadge
-              cents={card.fmvPriceInUsd}
-              updatedAt={card.fmvUpdatedAt}
+              cents={card.rixPriceInUsd}
+              updatedAt={card.rixPriceUpdatedAt}
             />
           )}
         </div>

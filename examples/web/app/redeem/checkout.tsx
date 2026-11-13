@@ -5,7 +5,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { countdown, explorerTx, shortHex, usd, usdt } from '../eoa/format';
+import {
+  countdown,
+  explorerTx,
+  shortHex,
+  usd,
+  usdt,
+  usdtAllowance,
+} from '../eoa/format';
 import { DeveloperPanel } from './developer-panel';
 import styles from './redeem.module.css';
 import { unwrap, useRedeem } from './redeem-provider';
@@ -479,8 +486,8 @@ function CheckoutForm() {
                     <span className={styles.itemName}>{card.name}</span>
                     <div className={styles.rowLine}>
                       <FmvBadge
-                        cents={card.fmvPriceInUsd}
-                        updatedAt={card.fmvUpdatedAt}
+                        cents={card.rixPriceInUsd}
+                        updatedAt={card.rixPriceUpdatedAt}
                       />
                       <span className={`${styles.small} ${styles.muted}`}>
                         {card.regionCountryCode}
@@ -811,7 +818,7 @@ function CheckoutForm() {
                           : undefined
                       }
                     >
-                      $ {usdt(allowance, 2)}
+                      {usdtAllowance(allowance)}
                       {lines && allowance < centsToUsdt(lines.total)
                         ? ' · approval tx will be requested first'
                         : ''}
@@ -1199,8 +1206,8 @@ function Confirmation({ outcome }: { outcome: Outcome }) {
                 <div className={styles.summaryItemBody}>
                   <span className={styles.itemName}>{card.name}</span>
                   <FmvBadge
-                    cents={card.fmvPriceInUsd}
-                    updatedAt={card.fmvUpdatedAt}
+                    cents={card.rixPriceInUsd}
+                    updatedAt={card.rixPriceUpdatedAt}
                   />
                 </div>
               </div>

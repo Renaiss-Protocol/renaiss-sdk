@@ -54,7 +54,7 @@ describe('v2 error codes', () => {
       ApiJsonResponse<
         '/v2/gacha/packs/{slug}/content',
         'get',
-        400 | 404 | 429
+        400 | 401 | 403 | 404 | 429
       > extends { code: infer Code }
         ? Code
         : never;

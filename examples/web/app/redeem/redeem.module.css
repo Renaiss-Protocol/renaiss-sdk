@@ -1029,6 +1029,11 @@
   gap: 12px;
   color: #acacac;
 }
+.breakdownRow > span:last-child {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .breakdownTotal {
   border-top: 1px solid var(--line2);
   padding-top: 16px;

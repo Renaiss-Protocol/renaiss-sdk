@@ -20,11 +20,8 @@ export enum GachaMachineStage {
   Archived = 'archived',
 }
 
-export enum GachaQuantity {
-  Single = 1,
-  Five = 5,
-  Ten = 10,
-}
+/** The most cards one /v2 pull takes. */
+export const MAX_GACHA_PULL_QUANTITY = 10;
 
 export enum GachaMachineTierName {
   Top = 'TOP',
@@ -42,11 +39,12 @@ export enum GachaMachineTierName {
   Bloom = 'bloom',
   Crown = 'crown',
 }
-export const GachaQuantitySchema = z.union([
-  z.literal(GachaQuantity.Single),
-  z.literal(GachaQuantity.Five),
-  z.literal(GachaQuantity.Ten),
-]);
+/** Cards in one /v2 pull: any whole number from 1 to MAX_GACHA_PULL_QUANTITY. */
+export const GachaQuantitySchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_GACHA_PULL_QUANTITY);
 const GachaMachineTierChanceSchema = z.union([
   z.number(),
   z.literal('UNDER-1-PERCENT'),
@@ -65,16 +63,39 @@ export const PaginationResponseSchema = z.object({
 });
 
 /**
+ * A collectible's buyback bonus. The base buyback value next to it and the
+ * buyback tier amounts already include it: do not apply it again.
+ */
+export const GachaBuybackBonusSchema = z.object({
+  /** The base buyback value before the bonus, in USD cents. Frozen when the set formed. */
+  originalBuybackBaseValueInUSD: numericStringSchema,
+  /** The bonus in basis points: 2000 means +20%. */
+  bonusBps: z.number().int(),
+});
+export type GachaBuybackBonus = z.infer<typeof GachaBuybackBonusSchema>;
+
+/**
  * One card that has left a gacha machine. Carries no pull time: an entry
- * surfaces only after its buyback window closes, so any timestamp would
- * describe the reveal rather than the pull.
+ * surfaces once its buyback window closes or 24 hours after the reveal,
+ * whichever comes first, so any timestamp would describe the reveal rather
+ * than the pull. An entry does not mean the card was delivered or its buyback
+ * settled.
  */
 export const GachaPullHistoryEntrySchema = z.object({
   tokenId: numericStringSchema,
   name: z.string(),
   tier: z.string(),
+  /** USD cents, bonus included. */
   buybackBaseValueInUsd: numericStringSchema,
+  /** Sent only to a verified builder key; null for an anonymous read or a card without a bonus. */
+  buybackBonus: GachaBuybackBonusSchema.nullable(),
   frontImageUrl: z.string(),
+  /**
+   * The card cut out of its slab photo: no slab, grade label, frame or
+   * background. It is the catalog photo, which can show another graded copy of
+   * the same card, and it is `frontImageUrl` when there is no cutout.
+   */
+  imageUrl: z.string(),
 });
 
 export type GachaPullHistoryEntry = z.infer<typeof GachaPullHistoryEntrySchema>;

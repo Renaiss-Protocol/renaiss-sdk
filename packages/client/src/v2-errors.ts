@@ -75,6 +75,51 @@ export function isListWalletPullsError(
 }
 
 import {
+  V2_LIST_WALLET_COLLECTION_ERROR_CODES,
+  type V2ListWalletCollectionErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2ListWalletCollectionErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows ListWalletCollection failures to its documented Result codes; never throws. */
+export function isListWalletCollectionError(
+  error: ApiError,
+): error is ApiError<V2ListWalletCollectionErrorCode> {
+  return (V2_LIST_WALLET_COLLECTION_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
+  V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES,
+  type V2FetchWalletCollectionSummaryErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2FetchWalletCollectionSummaryErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows FetchWalletCollectionSummary failures to its documented Result codes; never throws. */
+export function isFetchWalletCollectionSummaryError(
+  error: ApiError,
+): error is ApiError<V2FetchWalletCollectionSummaryErrorCode> {
+  return (
+    V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES as readonly string[]
+  ).includes(error.code);
+}
+
+import {
+  V2_LIST_WALLET_ACTIVITIES_ERROR_CODES,
+  type V2ListWalletActivitiesErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2ListWalletActivitiesErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows ListWalletActivities failures to its documented Result codes; never throws. */
+export function isListWalletActivitiesError(
+  error: ApiError,
+): error is ApiError<V2ListWalletActivitiesErrorCode> {
+  return (V2_LIST_WALLET_ACTIVITIES_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
   V2_FETCH_GACHA_DRAW_STATUS_ERROR_CODES,
   type V2FetchGachaDrawStatusErrorCode,
 } from '@renaiss-protocol/error-codes';
@@ -177,6 +222,66 @@ export function isSubmitGachaBuybackError(
   return (V2_SUBMIT_GACHA_BUYBACK_ERROR_CODES as readonly string[]).includes(
     error.code,
   );
+}
+
+import {
+  V2_START_GACHA_PULL_ERROR_CODES,
+  type V2StartGachaPullErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2StartGachaPullErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows StartGachaPull failures to its documented Result codes; never throws. */
+export function isStartGachaPullError(
+  error: ApiError,
+): error is ApiError<V2StartGachaPullErrorCode> {
+  return (V2_START_GACHA_PULL_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
+  V2_FETCH_GACHA_PULL_STATUS_ERROR_CODES,
+  type V2FetchGachaPullStatusErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2FetchGachaPullStatusErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows FetchGachaPullStatus failures to its documented Result codes; never throws. */
+export function isFetchGachaPullStatusError(
+  error: ApiError,
+): error is ApiError<V2FetchGachaPullStatusErrorCode> {
+  return (V2_FETCH_GACHA_PULL_STATUS_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
+  V2_START_GACHA_BUYBACK_ERROR_CODES,
+  type V2StartGachaBuybackErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2StartGachaBuybackErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows StartGachaBuyback failures to its documented Result codes; never throws. */
+export function isStartGachaBuybackError(
+  error: ApiError,
+): error is ApiError<V2StartGachaBuybackErrorCode> {
+  return (V2_START_GACHA_BUYBACK_ERROR_CODES as readonly string[]).includes(
+    error.code,
+  );
+}
+
+import {
+  V2_FETCH_GACHA_BUYBACK_STATUS_ERROR_CODES,
+  type V2FetchGachaBuybackStatusErrorCode,
+} from '@renaiss-protocol/error-codes';
+
+export type { V2FetchGachaBuybackStatusErrorCode } from '@renaiss-protocol/error-codes';
+/** Narrows FetchGachaBuybackStatus failures to its documented Result codes; never throws. */
+export function isFetchGachaBuybackStatusError(
+  error: ApiError,
+): error is ApiError<V2FetchGachaBuybackStatusErrorCode> {
+  return (
+    V2_FETCH_GACHA_BUYBACK_STATUS_ERROR_CODES as readonly string[]
+  ).includes(error.code);
 }
 
 import {

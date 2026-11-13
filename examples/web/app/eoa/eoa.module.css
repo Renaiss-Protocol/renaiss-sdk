@@ -620,6 +620,40 @@
   background: #000;
   border-radius: 8px;
 }
+/* A tile is as narrow as 112px: stack the caption and let each line wrap or
+   truncate inside the tile instead of overflowing into its neighbours. */
+.slabMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+.slabName {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  /* Two lines always, so the values of one row line up. */
+  min-height: calc(2 * 1.3em);
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.slabValueKey {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.slabValue {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .copies {
   position: absolute;
   top: 6px;

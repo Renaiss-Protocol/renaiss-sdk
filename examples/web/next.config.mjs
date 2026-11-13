@@ -9,8 +9,10 @@ export default function config(phase) {
     );
   return {
     images: {
+      // The API serves card images from more than one Vercel Blob store (slab
+      // renders, catalog cutouts, cert photos), so allow any store's host.
       remotePatterns: [
-        new URL('https://8nothtoc5ds7a0x3.public.blob.vercel-storage.com/**'),
+        { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
       ],
     },
     // Inline the default too. An omitted build-time variable must not become

@@ -8,12 +8,13 @@ import type {
 } from '@renaiss-protocol/client';
 import Image from 'next/image';
 import { type ReactNode, useState } from 'react';
-import { usd, usdToUsdt, usdt } from '../eoa/format';
+import { usd, usdToUsdt, usdt, usdtAllowance } from '../eoa/format';
 import { FmvBadge } from './card-grid';
 import {
   cardDisplayRows,
   formatDateTime,
   MINIMUM_OFFER,
+  offerExpiresAt,
   parseUsdtInput,
   usdtToInput,
 } from './helpers';
@@ -97,10 +98,10 @@ function DialogCard({ card }: { card: CardDetail }) {
           </div>
           <div className={styles.metaLine2}>{secondRow}</div>
         </div>
-        {card.fmvPriceInUsd !== null ? (
+        {card.rixPriceInUsd !== null ? (
           <FmvBadge
-            cents={card.fmvPriceInUsd}
-            updatedAt={card.fmvUpdatedAt}
+            cents={card.rixPriceInUsd}
+            updatedAt={card.rixPriceUpdatedAt}
             size='large'
           />
         ) : (
@@ -160,7 +161,7 @@ function AllowanceRow({
     <div className={styles.breakdownRow}>
       <span>Permit2 allowance</span>
       <span className={short ? styles.sUnused : undefined}>
-        $ {usdt(allowance, 2)}
+        {usdtAllowance(allowance)}
         {short ? ' · approval tx will be requested first' : ''}
       </span>
     </div>
@@ -262,7 +263,7 @@ export function MakeOfferDialog({
   const ask = card.askPriceInUsdt === null ? null : BigInt(card.askPriceInUsdt);
   const aboveAsk = parsed !== null && ask !== null && parsed > ask;
   const days = DURATIONS.find((d) => d.value === duration)?.days ?? 180;
-  const expiresAt = new Date(Date.now() + days * 86_400_000);
+  const expiresAt = offerExpiresAt(days * 86_400, Date.now());
   return (
     <Dialog
       title='Make an offer'
@@ -414,7 +415,7 @@ export function ListCardDialog({
   mode: 'list' | 'edit';
   feeBps: bigint;
   result: AskQuote | null;
-  onConfirm: (sellerReceivesInUsdt: bigint) => void;
+  onConfirm: (totalPriceInUsdt: bigint) => void;
 }) {
   const [price, setPrice] = useState('');
   const parsed = parseUsdtInput(price);
@@ -473,7 +474,7 @@ export function ListCardDialog({
               type='button'
               className={`${styles.btn} ${styles.btnSolid} ${styles.btnTall}`}
               disabled={busy || !canSubmit || parsed === null}
-              onClick={() => parsed !== null && onConfirm(parsed)}
+              onClick={() => total !== null && onConfirm(total)}
             >
               {busy
                 ? mode === 'edit'
@@ -640,7 +641,7 @@ export function AcceptOfferDialog({
   const receive = (amount * BPS) / (BPS + feeBps);
   const fee = amount - receive;
   const fmvUsdt =
-    card.fmvPriceInUsd === null ? null : usdToUsdt(card.fmvPriceInUsd);
+    card.rixPriceInUsd === null ? null : usdToUsdt(card.rixPriceInUsd);
   const belowFmv = fmvUsdt !== null && amount * 10n < fmvUsdt * 8n;
   return (
     <Dialog
@@ -685,10 +686,10 @@ export function AcceptOfferDialog({
           <span>You will receive</span>
           <span>$ {usdt(receive, 2)}</span>
         </div>
-        {card.fmvPriceInUsd !== null && (
+        {card.rixPriceInUsd !== null && (
           <div className={styles.breakdownRow}>
             <span>FMV</span>
-            <span>$ {usd(card.fmvPriceInUsd, 2)}</span>
+            <span>$ {usd(card.rixPriceInUsd, 2)}</span>
           </div>
         )}
       </div>

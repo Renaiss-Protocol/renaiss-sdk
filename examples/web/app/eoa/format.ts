@@ -38,6 +38,18 @@ export function usdt(units: string | bigint, decimals = 2) {
   return frac ? `${whole}.${frac}` : whole;
 }
 
+/**
+ * Wallets and dapps often approve `2^256 - 1` ("infinite"); tokens that
+ * decrement it leave a value just below. Anything from `2^255` up reads as
+ * unlimited.
+ */
+const UNLIMITED_ALLOWANCE = 2n ** 255n;
+
+/** Formats an 18-decimal USDT allowance. Infinite approvals → `Unlimited`. */
+export function usdtAllowance(units: bigint) {
+  return units >= UNLIMITED_ALLOWANCE ? 'Unlimited' : `$ ${usdt(units, 2)}`;
+}
+
 /** Converts a USD cent string to 18-decimal USDT units. */
 export function usdToUsdt(cents: string) {
   return (BigInt(cents) * USDT_UNIT) / CENTS;

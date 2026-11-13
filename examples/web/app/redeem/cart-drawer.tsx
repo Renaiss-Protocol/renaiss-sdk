@@ -59,8 +59,8 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
                 </span>
                 <div className={styles.rowLine}>
                   <FmvBadge
-                    cents={card.fmvPriceInUsd}
-                    updatedAt={card.fmvUpdatedAt}
+                    cents={card.rixPriceInUsd}
+                    updatedAt={card.rixPriceUpdatedAt}
                   />
                   <button
                     type='button'

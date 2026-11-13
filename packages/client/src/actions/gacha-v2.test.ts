@@ -6,8 +6,16 @@ import {
 } from '@renaiss-protocol/fp';
 import {
   buildGachaPullTypedData,
+  EoaActivityFilter,
+  EoaActivityType,
+  EoaBuybackRequestStatus,
+  EoaCollectionCardStatus,
+  EoaCollectionSort,
   type EoaPreparedPull,
+  EoaPullRequestStatus,
   type EoaSignedPull,
+  EoaSortOrder,
+  GachaMachineTierName,
 } from '@renaiss-protocol/schema-validation';
 import {
   createWalletClient,
@@ -17,13 +25,23 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BNB_TESTNET, createGachaClient } from '../index';
+import {
+  BNB_TESTNET,
+  createGachaClient,
+  type EoaWalletActivitiesRequest,
+  type EoaWalletCollectionRequest,
+  getEoaBuybackOfferEndsAt,
+  getEoaBuybackTierAt,
+  isFetchGachaPullStatusError,
+  isStartGachaPullError,
+} from '../index';
 import { signerFrom } from '../viem';
 
 // Publicly known test key: it must never hold funds.
 const account = privateKeyToAccount(`0x${'0'.repeat(63)}1`);
 const packId = '11111111-1111-4111-8111-111111111111';
 const hash = `0x${'ab'.repeat(32)}`;
+const requestId = '6f1c2a9e-4b7d-4e3a-9c15-8a2d0f7b3e64';
 const token = BNB_TESTNET.marketplace.contracts.usdt;
 const spender = BNB_TESTNET.marketplace.contracts.permit2;
 const tvm = BNB_TESTNET.vendingMachineAddress;
@@ -74,14 +92,15 @@ function machineDetail() {
     stage: 'active',
     description: 'Pack description',
     expectedValueInUsd: null,
-    featuredCardFmvInUsd: null,
     packBannerVideoUrl: null,
     gachaMachineVideoUrl: null,
     gachaRippingPackAnimationVideoUrl: null,
     tiers: [],
     activeSetExpectedValueInUsd: '1000',
-    buybackPercentage: 85,
-    buybackWindowSeconds: 600,
+    buybackConfig: [
+      { buybackPercentage: 85, buybackExpiredInSeconds: 600 },
+      { buybackPercentage: 70, buybackExpiredInSeconds: 86400 },
+    ],
   };
 }
 function expectation() {
@@ -89,7 +108,7 @@ function expectation() {
     packId,
     onChainPackId: `0x${'66'.repeat(32)}` as const,
     priceInUsdt: BigInt(amount),
-    quantity: 1 as const,
+    quantity: 1,
   };
 }
 function value<T>(result: Result<T>): T {
@@ -118,18 +137,30 @@ const resolved = {
       tokenId: '9007199254740993000',
       releaseTxHash: null,
       buybackTxHash: null,
-      collectible: {
-        name: 'Pokémon',
-        setName: 'Set',
-        imageUrl: 'https://test.example/item.png',
-        frontImageUrl: 'https://test.example/front.png',
-        tier: 'S',
-        buybackBaseValueInUSD: '1000',
-        snapshotBuybackValueInUsdt: amount,
-      },
+      tier: 'S',
+      buybackBaseValueInUSD: '1200',
+      buybackBonus: { originalBuybackBaseValueInUSD: '1000', bonusBps: 2000 },
+      buybackTiers: [
+        {
+          buybackPercentage: 90,
+          amountInUsdt: '10800000000000000000',
+          expiresAt: '2026-10-14T01:00:00.000Z',
+        },
+      ],
+      // The API sends the collectible's fields on the draw itself.
+      type: 'POKEMON',
+      name: 'Pokémon',
+      frontImageUrl: 'https://test.example/front.png',
+      attributes: [
+        { key: 'Grader', value: 'PSA' },
+        { key: 'Grade', value: '10 Gem Mint' },
+      ],
     },
   ],
 };
+// The draws_resolved event carries no `status`: the event itself says the
+// pull resolved.
+const { status: _status, ...resolvedEvent } = resolved;
 function frame(event: string, data: unknown) {
   return `event: ${event}\r\ndata: ${JSON.stringify(data)}\r\n\r\n`;
 }
@@ -258,16 +289,21 @@ describe('v2 EOA signing and stream boundaries', () => {
     const input = prepared();
     const machine = machineDetail();
     const card = {
+      tokenId: '9007199254740997',
       name: 'Card',
       tier: 'S',
       buybackBaseValueInUsd: '9007199254740993',
       frontImageUrl: 'https://test.example/front.png',
+      type: 'POKEMON',
     };
     const pagination = { total: 1, limit: 20, offset: 0, hasMore: false };
+    const contentQueries: URLSearchParams[] = [];
     const fetch = vi.fn(async (url: string | URL | Request) => {
-      const path = new URL(String(url)).pathname;
-      if (path.endsWith('/content'))
-        return Response.json({ cards: [card], pagination });
+      const { pathname: path, searchParams } = new URL(String(url));
+      if (path.endsWith('/content')) {
+        contentQueries.push(searchParams);
+        return Response.json({ collectibles: [card], pagination });
+      }
       if (path.endsWith('/pull-history'))
         return Response.json({ pulls: [], pagination });
       if (path.endsWith('/packs'))
@@ -295,6 +331,21 @@ describe('v2 EOA signing and stream boundaries', () => {
           .firstPage(),
       ).items,
     ).toEqual([card]);
+    await client
+      .listGachaMachineContents({
+        slug: 'test-pack',
+        tiers: [GachaMachineTierName.S, GachaMachineTierName.A],
+      })
+      .firstPage();
+    // No tier filter unless asked; several tiers go comma-separated.
+    expect(contentQueries.map((query) => query.get('tier'))).toEqual([
+      null,
+      'S,A',
+    ]);
+    expect(
+      value(await client.fetchGachaMachine({ slug: 'test-pack' }))
+        .buybackConfig,
+    ).toEqual(machine.buybackConfig);
     expect(
       value(
         await client.listGachaPullHistory({ slug: 'test-pack' }).firstPage(),
@@ -488,7 +539,7 @@ describe('v2 EOA signing and stream boundaries', () => {
     const wire = new TextEncoder().encode(
       ': keep-alive\r\n\r\n' +
         frame('payment_confirmed', { ...context, permitFundTxHash: hash }) +
-        frame('draws_resolved', resolved),
+        frame('draws_resolved', resolvedEvent),
     );
     const stream = new ReadableStream({
       start(controller) {
@@ -512,7 +563,25 @@ describe('v2 EOA signing and stream boundaries', () => {
       }),
     );
     expect(events).toEqual(['payment_confirmed', 'draws_resolved']);
-    expect(result.draws[0]?.collectible.name).toBe('Pokémon');
+    expect(result.status).toBe('RESOLVED');
+    // The frozen values sit on the draw; the SDK groups what the collectible
+    // is under `collectible`.
+    expect(result.draws[0]).toEqual({
+      settlementId: resolved.draws[0]?.settlementId,
+      tokenId: resolved.draws[0]?.tokenId,
+      releaseTxHash: null,
+      buybackTxHash: null,
+      tier: 'S',
+      buybackBaseValueInUSD: '1200',
+      buybackBonus: { originalBuybackBaseValueInUSD: '1000', bonusBps: 2000 },
+      buybackTiers: resolved.draws[0]?.buybackTiers,
+      collectible: {
+        type: 'POKEMON',
+        name: 'Pokémon',
+        frontImageUrl: 'https://test.example/front.png',
+        attributes: resolved.draws[0]?.attributes,
+      },
+    });
     expect(cancel).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledOnce();
   });
@@ -521,11 +590,13 @@ describe('v2 EOA signing and stream boundaries', () => {
     'malformed',
     'callback',
     'failure',
-  ] as const)('retains funding hash on %s and never retries', async (kind) => {
-    const start = frame('payment_confirmed', {
-      ...context,
-      permitFundTxHash: hash,
-    });
+  ] as const)('retains funding hash and request id on %s and never retries', async (kind) => {
+    const start =
+      frame('pull_started', { ...context, requestId }) +
+      frame('payment_confirmed', {
+        ...context,
+        permitFundTxHash: hash,
+      });
     const end =
       kind === 'malformed'
         ? 'event: draws_resolved\ndata: {broken}\n\n'
@@ -544,8 +615,9 @@ describe('v2 EOA signing and stream boundaries', () => {
       baseUrl: 'https://test.example',
     }).submitGachaPull({
       pull: signed(),
-      onEvent() {
-        if (kind === 'callback') throw new Error('Persistence failed');
+      onEvent(event) {
+        if (kind === 'callback' && event.event === 'payment_confirmed')
+          throw new Error('Persistence failed');
       },
     });
     expect(isFailed(result)).toBe(true);
@@ -553,6 +625,7 @@ describe('v2 EOA signing and stream boundaries', () => {
     expect(getError(result).error).toMatchObject({
       permitFundTxHash: hash,
       fundingConfirmed: true,
+      requestId,
     });
     expect(fetch).toHaveBeenCalledOnce();
   });
@@ -561,7 +634,9 @@ describe('v2 EOA signing and stream boundaries', () => {
       'fetch',
       vi.fn(
         async () =>
-          new Response(frame('draws_resolved', { ...resolved, draws: [] })),
+          new Response(
+            frame('draws_resolved', { ...resolvedEvent, draws: [] }),
+          ),
       ),
     );
     const result = await createGachaClient({
@@ -589,15 +664,76 @@ describe('v2 EOA signing and stream boundaries', () => {
     );
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('sums compatible buybacks exactly and rejects duplicate settlement IDs', async () => {
-    const offers = [1, 2].map((n) => ({
-      cardPackId: packId,
-      settlementId: `0x${String(n).repeat(64)}`,
-      tokenId: String(n),
-      amountInUsdt: amount,
-      expiresAt: new Date(Date.now() + 600_000).toISOString(),
-      vendingMachineAddress: tvm,
-    }));
+  // An offer lists every tier; the first whose end has not passed prices it.
+  const tieredOffer = (
+    n: number,
+    tiers: { endsInMs: number; amountInUsdt: string }[],
+  ) => ({
+    cardPackId: packId,
+    settlementId: `0x${String(n).repeat(64)}`,
+    tokenId: String(n),
+    vendingMachineAddress: tvm,
+    buybackTiers: tiers.map((tier, index) => ({
+      buybackPercentage: 90 - index * 10,
+      amountInUsdt: tier.amountInUsdt,
+      expiresAt: new Date(Date.now() + tier.endsInMs).toISOString(),
+    })),
+  });
+  it('keeps the ending tier at its exact expiry and advances 1 ms later', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    const offer = tieredOffer(1, [
+      { endsInMs: 1_000, amountInUsdt: '90' },
+      { endsInMs: 60_000, amountInUsdt: '75' },
+    ]);
+    expect(getEoaBuybackTierAt(offer, now + 1_000)).toEqual(
+      offer.buybackTiers[0],
+    );
+    expect(getEoaBuybackTierAt(offer, now + 1_001)).toEqual(
+      offer.buybackTiers[1],
+    );
+    expect(getEoaBuybackTierAt(offer, now + 60_001)).toBeUndefined();
+  });
+  it('ends the payable offer at the last positive tier, before a zero hold', () => {
+    const offer = tieredOffer(1, [
+      { endsInMs: 1_000, amountInUsdt: '90' },
+      { endsInMs: 60_000, amountInUsdt: '75' },
+      { endsInMs: 120_000, amountInUsdt: '0' },
+    ]);
+    expect(getEoaBuybackOfferEndsAt(offer)).toBe(
+      offer.buybackTiers[1]?.expiresAt,
+    );
+    expect(getEoaBuybackOfferEndsAt(tieredOffer(1, []))).toBeUndefined();
+    expect(
+      getEoaBuybackOfferEndsAt(
+        tieredOffer(1, [{ endsInMs: 60_000, amountInUsdt: '0' }]),
+      ),
+    ).toBeUndefined();
+  });
+  it('signs the ending tier price at its exact expiry', async () => {
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const offer = tieredOffer(1, [
+      { endsInMs: 1_000, amountInUsdt: '90' },
+      { endsInMs: 60_000, amountInUsdt: '75' },
+    ]);
+    clock.mockReturnValue(now + 1_000);
+    const result = value(
+      await createGachaClient({
+        baseUrl: 'https://test.example',
+        signer,
+        expectedChainId: 97,
+      }).createGachaBuyback({
+        buyerWalletAddress: account.address,
+        chainId: 97,
+        token,
+        expectedAmountInUsdt: '90',
+        offers: [offer],
+      }),
+    );
+    expect(result.buybackAuth.amount).toBe('90');
+  });
+  it("signs the price of each offer's current tier", async () => {
     const client = createGachaClient({
       baseUrl: 'https://test.example',
       signer,
@@ -608,6 +744,89 @@ describe('v2 EOA signing and stream boundaries', () => {
         buyerWalletAddress: account.address,
         chainId: 97,
         token,
+        expectedAmountInUsdt: '150',
+        offers: [1, 2].map((n) =>
+          tieredOffer(n, [
+            { endsInMs: -60_000, amountInUsdt: '90' },
+            { endsInMs: 600_000, amountInUsdt: '75' },
+            { endsInMs: 86_400_000, amountInUsdt: '50' },
+          ]),
+        ),
+      }),
+    );
+    // The ended 90 tier and the later 50 tier are not signed.
+    expect(result.buybackAuth.amount).toBe('150');
+  });
+  it('refuses a changed buyback quote before requesting a signature', async () => {
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const offers = [1, 2].map((n) =>
+      tieredOffer(n, [
+        { endsInMs: 1_000, amountInUsdt: '90' },
+        { endsInMs: 60_000, amountInUsdt: '75' },
+      ]),
+    );
+    const signTypedData = vi.spyOn(signer, 'signTypedData');
+    clock.mockReturnValue(now + 1_001);
+    const result = await createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+      expectedChainId: 97,
+    }).createGachaBuyback({
+      buyerWalletAddress: account.address,
+      chainId: 97,
+      token,
+      expectedAmountInUsdt: '180',
+      offers,
+    });
+    expect(isFailed(result) && getError(result).code).toBe(
+      'WRONG_REQUEST_PARAMS',
+    );
+    expect(signTypedData).not.toHaveBeenCalled();
+  });
+  it.each([
+    {
+      name: 'every tier has ended',
+      tiers: [{ endsInMs: -60_000, amountInUsdt: '90' }],
+    },
+    {
+      name: 'the current tier pays nothing',
+      tiers: [
+        { endsInMs: 600_000, amountInUsdt: '0' },
+        { endsInMs: 86_400_000, amountInUsdt: '50' },
+      ],
+    },
+  ])('refuses an offer when $name', async ({ tiers }) => {
+    const result = await createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+      expectedChainId: 97,
+    }).createGachaBuyback({
+      buyerWalletAddress: account.address,
+      chainId: 97,
+      token,
+      expectedAmountInUsdt: '90',
+      offers: [tieredOffer(1, tiers)],
+    });
+    expect(isFailed(result) && getError(result).code).toBe(
+      'WRONG_REQUEST_PARAMS',
+    );
+  });
+  it('sums compatible buybacks exactly and rejects duplicate settlement IDs', async () => {
+    const offers = [1, 2].map((n) =>
+      tieredOffer(n, [{ endsInMs: 600_000, amountInUsdt: amount }]),
+    );
+    const client = createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+      expectedChainId: 97,
+    });
+    const result = value(
+      await client.createGachaBuyback({
+        buyerWalletAddress: account.address,
+        chainId: 97,
+        token,
+        expectedAmountInUsdt: (BigInt(amount) * 2n).toString(),
         offers,
       }),
     );
@@ -618,6 +837,7 @@ describe('v2 EOA signing and stream boundaries', () => {
       buyerWalletAddress: account.address,
       chainId: 97,
       token,
+      expectedAmountInUsdt: (BigInt(amount) * 2n).toString(),
       offers: [first, first],
     });
     expect(isFailed(duplicate) && getError(duplicate).code).toBe(
@@ -674,6 +894,523 @@ describe('v2 EOA signing and stream boundaries', () => {
   });
 });
 
+// Shaped like the testnet API's own responses.
+const walletPath = `/v2/users/${account.address.toLowerCase()}`;
+const collectionCard = {
+  tokenId:
+    '9290192362618583476986046631910600140719430898595863842444180055985504940147',
+  name: 'PSA 8 NM-MT 2025 Pokemon Japanese M1l-Mega Brave #68 Riolu',
+  type: 'POKEMON',
+  frontImageUrl: 'https://test.example/renders/nft_image_silver.jpg',
+  rixPriceInUsd: '2200',
+  rixPriceUpdatedAt: '2026-09-29T00:00:00.000Z',
+};
+const cardPull = {
+  packId,
+  packName: 'PANDORA 28',
+  permitFundTxHash: `0x${'71'.repeat(32)}`,
+  pulledAt: '2026-09-29T05:26:07.000Z',
+};
+// One card per state: bought on the market, pulled and in its window, pulled and waiting.
+const heldCards = [
+  { ...collectionCard, state: { status: 'IN_WALLET' }, pull: null },
+  {
+    ...collectionCard,
+    state: {
+      status: 'IN_BUYBACK_WINDOW',
+      buybackBaseValueInUSD: '4704',
+      buybackBonus: null,
+      buybackTiers: [
+        {
+          buybackPercentage: 90,
+          amountInUsdt: '42336000000000000000',
+          expiresAt: '2026-09-29T05:36:07.000Z',
+        },
+        {
+          buybackPercentage: 50,
+          amountInUsdt: '23520000000000000000',
+          expiresAt: '2026-10-29T05:26:07.000Z',
+        },
+      ],
+    },
+    pull: cardPull,
+  },
+  {
+    ...collectionCard,
+    rixPriceInUsd: null,
+    rixPriceUpdatedAt: null,
+    state: { status: 'AWAITING_DELIVERY' },
+    pull: cardPull,
+  },
+];
+function builderClient() {
+  return createGachaClient({
+    baseUrl: 'https://test.example',
+    builderApiKey: 'test-builder',
+  });
+}
+
+describe('v2 pull quantity', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  function threeCards() {
+    const input = prepared();
+    const typed = {
+      amountPerToken: amount,
+      builderCode: input.unsignedPullPayload.builderCode,
+      chainId: 97,
+      deadline: input.unsignedPullPayload.deadline,
+      nonce: '123',
+      numOfTokens: 3,
+      onChainPackId: input.pack.onChainPackId,
+      permit2Address: spender,
+      usdtAddress: token,
+      vendingMachineAddress: tvm,
+    };
+    return {
+      ...input,
+      approval: {
+        ...input.approval,
+        requiredAmount: String(BigInt(amount) * 3n),
+      },
+      unsignedPullPayload: { ...input.unsignedPullPayload, numOfTokens: 3 },
+      permit2TypedData: buildGachaPullTypedData(typed),
+    };
+  }
+  it('prepares and signs a pull of three cards for three times the price', async () => {
+    const bodies: unknown[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!url.endsWith('/prepare'))
+          return Response.json({ cardPack: machineDetail() });
+        bodies.push(JSON.parse(String(init?.body)));
+        return Response.json(threeCards());
+      }),
+    );
+    const client = createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+      expectedChainId: 97,
+    });
+    const result = value(
+      await client.prepareGachaPull({
+        machineSlug: 'test-pack',
+        buyerWalletAddress: account.address,
+        expectedPriceInUsdt: BigInt(amount),
+        quantity: 3,
+      }),
+    );
+    expect(bodies).toEqual([
+      { packId, buyerWalletAddress: account.address, quantity: 3 },
+    ]);
+    expect(result.unsignedPullPayload.numOfTokens).toBe(3);
+    expect(result.approval.requiredAmount).toBe(String(BigInt(amount) * 3n));
+    const pull = value(
+      await client.signGachaPull({
+        prepared: result,
+        expected: { ...expectation(), quantity: 3 },
+      }),
+    );
+    expect(pull.numOfTokens).toBe(3);
+    expect(
+      await recoverTypedDataAddress({
+        ...result.permit2TypedData,
+        signature: pull.permitSignature as Hex,
+      }),
+    ).toBe(account.address);
+  });
+  it('refuses a prepared pull whose quantity is not the one reviewed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        Response.json(
+          url.endsWith('/prepare')
+            ? threeCards()
+            : { cardPack: machineDetail() },
+        ),
+      ),
+    );
+    const result = await createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+    }).prepareGachaPull({
+      machineSlug: 'test-pack',
+      buyerWalletAddress: account.address,
+      expectedPriceInUsdt: BigInt(amount),
+      quantity: 2,
+    });
+    expect(isFailed(result) && getError(result).code).toBe('INVALID_SCHEMA');
+  });
+  it.each([
+    0, 11, 2.5, -1,
+  ])('refuses quantity %s before any request', async (quantity) => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const result = await createGachaClient({
+      baseUrl: 'https://test.example',
+      signer,
+    }).prepareGachaPull({
+      machineSlug: 'test-pack',
+      buyerWalletAddress: account.address,
+      expectedPriceInUsdt: BigInt(amount),
+      quantity,
+    });
+    expect(isFailed(result) && getError(result).code).toBe(
+      'WRONG_REQUEST_PARAMS',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('v2 wallet cards, totals and activities', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  it('lists the cards with a sort, page by page, with the builder key', async () => {
+    const requests: Request[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        const request = new Request(input, init);
+        requests.push(request);
+        const offset = Number(new URL(input).searchParams.get('offset'));
+        return Response.json({
+          collectibles: [heldCards[offset]],
+          pagination: { limit: 1, offset, hasMore: offset < 2, total: 3 },
+        });
+      }),
+    );
+    const pages = [];
+    for await (const result of builderClient().listWalletCollection({
+      walletAddress: account.address,
+      sortBy: EoaCollectionSort.BuybackExpiry,
+      sortOrder: EoaSortOrder.Ascending,
+      pageSize: 1,
+    }))
+      pages.push(value(result));
+    expect(pages.map((page) => page.totalCount)).toEqual([3, 3, 3]);
+    expect(pages.flatMap((page) => page.items)).toEqual(heldCards);
+    const [bought] = pages[0]?.items ?? [];
+    expect(bought?.state.status).toBe(EoaCollectionCardStatus.InWallet);
+    expect(bought?.pull).toBeNull();
+    const [card] = pages[1]?.items ?? [];
+    if (card?.state.status !== EoaCollectionCardStatus.InBuybackWindow)
+      throw new Error('Expected a card in its buyback window');
+    expect(card.state.buybackBaseValueInUSD).toBe('4704');
+    expect(card.state.buybackTiers.map((tier) => tier.amountInUsdt)).toEqual([
+      '42336000000000000000',
+      '23520000000000000000',
+    ]);
+    expect(card.pull?.packName).toBe('PANDORA 28');
+    expect(
+      requests.map((request) =>
+        Object.fromEntries(new URL(request.url).searchParams),
+      ),
+    ).toEqual(
+      ['0', '1', '2'].map((offset) => ({
+        sortBy: 'buybackExpiresAt',
+        sortOrder: 'asc',
+        offset,
+        limit: '1',
+      })),
+    );
+    // The address is in the path, in lowercase, whatever case the caller has.
+    expect(account.address).not.toBe(account.address.toLowerCase());
+    expect(new URL(requests[0]?.url ?? '').pathname).toBe(
+      `${walletPath}/collectibles`,
+    );
+    expect(requests[0]?.headers.get('x-builder-api-key')).toBe('test-builder');
+  });
+  it('sends no sort unless asked, so the API defaults apply', async () => {
+    const urls: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        urls.push(new URL(input));
+        return Response.json({
+          collectibles: [],
+          pagination: { limit: 20, offset: 0, hasMore: false, total: 0 },
+        });
+      }),
+    );
+    const page = value(
+      await builderClient()
+        .listWalletCollection({ walletAddress: account.address })
+        .firstPage(),
+    );
+    expect(page).toMatchObject({ items: [], totalCount: 0, hasMore: false });
+    expect([...(urls[0]?.searchParams.keys() ?? [])].sort()).toEqual([
+      'limit',
+      'offset',
+    ]);
+  });
+  it('filters by token ids, comma-separated, before paging', async () => {
+    const urls: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        urls.push(new URL(input));
+        return Response.json({
+          collectibles: [heldCards[0]],
+          pagination: { limit: 20, offset: 0, hasMore: false, total: 1 },
+        });
+      }),
+    );
+    const page = value(
+      await builderClient()
+        .listWalletCollection({
+          walletAddress: account.address,
+          tokenIds: [collectionCard.tokenId, '42'],
+        })
+        .firstPage(),
+    );
+    expect(page.totalCount).toBe(1);
+    expect(urls[0]?.searchParams.get('tokenIds')).toBe(
+      `${collectionCard.tokenId},42`,
+    );
+  });
+  it.each([
+    ['a search, which the API does not have', { search: 'riolu' }],
+    ['an unknown sort', { sortBy: 'costInUsd' }],
+    ['an unknown direction', { sortOrder: 'up' }],
+    ["a builder of the caller's choosing", { builderCode: hash }],
+    ['the field of the builder-scoped reads', { buyerWalletAddress: hash }],
+    ['a malformed wallet', { walletAddress: '0x1234' }],
+    ['an empty token id filter', { tokenIds: [] }],
+    ['a token id that is not a decimal string', { tokenIds: ['0x12'] }],
+    ['more than 20 token ids', { tokenIds: Array(21).fill('1') }],
+  ])('refuses %s before any request', async (_, extra) => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const result = await builderClient()
+      .listWalletCollection({
+        walletAddress: account.address,
+        ...extra,
+      } as EoaWalletCollectionRequest)
+      .firstPage();
+    expect(isFailed(result) && getError(result).code).toBe(
+      'WRONG_REQUEST_PARAMS',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('reads the totals as exact strings', async () => {
+    const urls: URL[] = [];
+    const totals = {
+      collectibleCount: 4,
+      totalRixPriceInUsd: '9007199254740993',
+      collectiblesWithoutRixPrice: 1,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        urls.push(new URL(input));
+        return Response.json(totals);
+      }),
+    );
+    expect(
+      value(
+        await builderClient().fetchWalletCollectionSummary({
+          walletAddress: account.address,
+        }),
+      ),
+    ).toEqual(totals);
+    expect(urls[0]?.pathname).toBe(walletPath);
+    expect(urls[0]?.search).toBe('');
+  });
+  it('lists the activities as chain events and follows the cursor of the API', async () => {
+    const urls: URL[] = [];
+    const event = {
+      user: account.address.toLowerCase(),
+      timestamp: '1790659567',
+      blockNumber: '133805652',
+      txHash: `0x${'c3'.repeat(32)}`,
+    };
+    const item = {
+      tokenId: collectionCard.tokenId,
+      imageUrl: collectionCard.frontImageUrl,
+      title: 'Riolu',
+      subtitle: 'PSA 8 NM-MT',
+    };
+    const contract = '0x7777777777777777777777777777777777777777';
+    const first = [
+      {
+        ...event,
+        type: 'gacha-v3-pull',
+        contractAddress: contract,
+        packId: hash,
+        token: contract,
+        checkoutIds: ['41', '42', '43'],
+        totalAmount: '144000000000000000000',
+        blockHash: hash,
+      },
+      {
+        ...event,
+        type: 'gacha-v3-buyback',
+        contractAddress: contract,
+        buybackIds: [hash],
+        token: contract,
+        priceInUsdt: '17000000000000000000',
+      },
+    ];
+    const second = [
+      {
+        ...event,
+        item,
+        type: 'sell',
+        bidder: contract,
+        asker: event.user,
+        nftTokenId: item.tokenId,
+        erc20Token: contract,
+        amount: '30000000000000000000',
+        feeAccrued: '600000000000000000',
+      },
+      { ...event, item, type: 'transfer', to: contract, tokenId: item.tokenId },
+      { ...event, item, type: 'mint', tokenAmount: '1', tokenId: item.tokenId },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        urls.push(url);
+        return Response.json(
+          url.searchParams.has('cursor')
+            ? { activities: second, nextCursor: null }
+            : { activities: first, nextCursor: '133805652000072' },
+        );
+      }),
+    );
+    const pages = [];
+    for await (const result of builderClient().listWalletActivities({
+      walletAddress: account.address,
+      pageSize: 2,
+    }))
+      pages.push(value(result));
+    expect(pages.map((page) => page.items)).toEqual([first, second]);
+    expect(pages.map((page) => [page.hasMore, page.nextCursor])).toEqual([
+      [true, '133805652000072'],
+      [false, undefined],
+    ]);
+    const paid = pages.flatMap((page) =>
+      page.items.flatMap((activity) =>
+        activity.type === EoaActivityType.GachaV3Buyback
+          ? [activity.priceInUsdt]
+          : activity.type === EoaActivityType.Sell
+            ? [activity.amount]
+            : [],
+      ),
+    );
+    expect(paid).toEqual(['17000000000000000000', '30000000000000000000']);
+    expect(urls.map((url) => url.pathname)).toEqual([
+      `${walletPath}/activities`,
+      `${walletPath}/activities`,
+    ]);
+    expect(urls.map((url) => Object.fromEntries(url.searchParams))).toEqual([
+      { limit: '2' },
+      { cursor: '133805652000072', limit: '2' },
+    ]);
+  });
+  it('fails on an activity type the API no longer serves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          activities: [
+            {
+              user: account.address.toLowerCase(),
+              timestamp: '1790659567',
+              blockNumber: '133805652',
+              txHash: hash,
+              type: 'perp-pull',
+            },
+          ],
+          nextCursor: null,
+        }),
+      ),
+    );
+    const result = await builderClient()
+      .listWalletActivities({ walletAddress: account.address })
+      .firstPage();
+    expect(isFailed(result) && getError(result).code).toBe('INVALID_SCHEMA');
+  });
+  it('keeps one kind of activity with a filter', async () => {
+    const urls: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        urls.push(new URL(input));
+        return Response.json({ activities: [], nextCursor: null });
+      }),
+    );
+    const page = value(
+      await builderClient()
+        .listWalletActivities({
+          walletAddress: account.address,
+          filter: EoaActivityFilter.GachaV3Buyback,
+        })
+        .firstPage(),
+    );
+    expect(page).toEqual({ items: [], hasMore: false, nextCursor: undefined });
+    expect(Object.fromEntries(urls[0]?.searchParams ?? [])).toEqual({
+      filter: 'gacha-v3-buyback',
+      limit: '20',
+    });
+  });
+  it.each([
+    ['an unknown filter', { filter: 'everything' }, undefined],
+    ['a retired filter', { filter: 'perp-pull' }, undefined],
+    ['a page over 50', { pageSize: 51 }, undefined],
+    ['the type of the builder-scoped read', { type: 'buyback' }, undefined],
+    ['a cursor that is not from the API', {}, 'eyJvZmZzZXQiOjF9'],
+  ])('refuses %s before any request', async (_, extra, cursor) => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const result = await builderClient()
+      .listWalletActivities({
+        walletAddress: account.address,
+        ...extra,
+      } as EoaWalletActivitiesRequest)
+      .from(cursor)
+      .firstPage();
+    expect(isFailed(result) && getError(result).code).toBe(
+      'WRONG_REQUEST_PARAMS',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each([
+    [
+      'a card state it does not know',
+      () =>
+        builderClient()
+          .listWalletCollection({ walletAddress: account.address })
+          .firstPage(),
+      {
+        collectibles: [{ ...heldCards[0], state: { status: 'SOLD' } }],
+        pagination: { limit: 20, offset: 0, hasMore: false, total: 1 },
+      },
+    ],
+    [
+      'an activity type it does not know',
+      () =>
+        builderClient()
+          .listWalletActivities({ walletAddress: account.address })
+          .firstPage(),
+      {
+        activities: [{ type: 'airdrop', user: account.address }],
+        nextCursor: null,
+      },
+    ],
+  ])('reports %s as INVALID_SCHEMA', async (_, read, body) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(body)),
+    );
+    const result = await read();
+    expect(isFailed(result) && getError(result).code).toBe('INVALID_SCHEMA');
+  });
+});
+
 describe('fetchGachaBuybackOffers pages', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -683,9 +1420,14 @@ describe('fetchGachaBuybackOffers pages', () => {
     cardPackId: packId,
     settlementId: `0x${n.toString(16).padStart(64, '0')}`,
     tokenId: String(n),
-    amountInUsdt: amount,
-    expiresAt: new Date(Date.now() + 600_000).toISOString(),
     vendingMachineAddress: tvm,
+    buybackTiers: [
+      {
+        buybackPercentage: 90,
+        amountInUsdt: amount,
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      },
+    ],
   });
   const client = () =>
     createGachaClient({
@@ -846,5 +1588,355 @@ describe('fetchGachaBuybackOffers pages', () => {
       expect(getError(result).detail).toMatch(/could not confirm/);
     }
     expect(urls.at(-1)?.searchParams.get('offset')).toBe('10000');
+  });
+});
+
+describe('v2 draw status', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  it('reads each draw with its values and collectible, and nulls for what could not be loaded', async () => {
+    const [loaded] = resolved.draws;
+    if (!loaded) throw new Error('Expected a resolved draw');
+    const { type, name, frontImageUrl, attributes, ...values } = loaded;
+    const unloaded = {
+      ...values,
+      settlementId: `0x${'89'.repeat(32)}`,
+      tier: null,
+      buybackBaseValueInUSD: null,
+      buybackBonus: null,
+    };
+    const pull = {
+      permitFundTxHash: hash,
+      buyerWalletAddress: account.address.toLowerCase(),
+      packId,
+      packName: 'Test',
+      status: 'RESOLVED',
+      numOfTokens: 2,
+      pulledAt: resolved.pulledAt,
+    };
+    const urls: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        urls.push(new URL(input));
+        // A draw whose collectible could not be loaded has no collectible fields.
+        return Response.json({ ...pull, draws: [loaded, unloaded] });
+      }),
+    );
+    expect(
+      value(
+        await builderClient().fetchGachaDrawStatus({
+          buyerWalletAddress: account.address,
+          permitFundTxHash: hash,
+        }),
+      ),
+    ).toEqual({
+      ...pull,
+      draws: [
+        {
+          ...values,
+          collectible: { type, name, frontImageUrl, attributes },
+        },
+        { ...unloaded, collectible: null },
+      ],
+    });
+    expect(urls[0]?.pathname).toBe('/v2/gacha/draw-status');
+  });
+});
+
+describe('v2 machine reads and the builder key', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const pagination = { limit: 20, offset: 0, hasMore: false };
+  // One answer per route, so each read parses whatever the request.
+  function stubMachineRoutes(headers: Headers[]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        headers.push(new Request(input, init).headers);
+        const path = new URL(input).pathname;
+        const machine = machineDetail();
+        if (path === '/v2/gacha/packs')
+          return Response.json({
+            cardPacks: [machine],
+            pagination: { ...pagination, total: 1 },
+          });
+        if (path.endsWith('/content'))
+          return Response.json({
+            collectibles: [
+              {
+                tokenId: '9007199254740997',
+                name: 'Synthetic catalog collectible',
+                tier: 'C',
+                buybackBaseValueInUsd: '5000',
+                frontImageUrl: 'https://test.example/front.png',
+                type: 'POKEMON',
+              },
+            ],
+            pagination: { ...pagination, total: 1 },
+          });
+        if (path.endsWith('/pull-history'))
+          return Response.json({ pulls: [], pagination });
+        return Response.json({ cardPack: machine });
+      }),
+    );
+  }
+  function readAllMachineRoutes(sdk: ReturnType<typeof createGachaClient>) {
+    return Promise.all([
+      sdk.listGachaMachines().firstPage(),
+      sdk.fetchGachaMachine({ slug: 'test-pack' }),
+      sdk.listGachaMachineContents({ slug: 'test-pack' }).firstPage(),
+      sdk.listGachaPullHistory({ slug: 'test-pack' }).firstPage(),
+    ]);
+  }
+
+  it('sends the builder key on every machine read', async () => {
+    const headers: Headers[] = [];
+    stubMachineRoutes(headers);
+    const [list, detail, contents, history] = await readAllMachineRoutes(
+      builderClient(),
+    );
+    expect(value(list).items).toHaveLength(1);
+    value(detail);
+    expect(value(contents).items[0]?.tokenId).toBe('9007199254740997');
+    value(history);
+    expect(headers.map((h) => h.get('x-builder-api-key'))).toEqual(
+      Array(4).fill('test-builder'),
+    );
+  });
+
+  it('still reads every machine route without a builder key, sending none', async () => {
+    const headers: Headers[] = [];
+    stubMachineRoutes(headers);
+    const [list, detail, contents, history] = await readAllMachineRoutes(
+      createGachaClient({ baseUrl: 'https://test.example' }),
+    );
+    value(list);
+    value(detail);
+    expect(value(contents).items[0]?.tokenId).toBe('9007199254740997');
+    value(history);
+    expect(headers.map((h) => h.has('x-builder-api-key'))).toEqual(
+      Array(4).fill(false),
+    );
+  });
+});
+
+describe('v2 pull and buyback requests', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const pullRequest = {
+    requestId,
+    buyerWalletAddress: account.address.toLowerCase(),
+    packId,
+    nonce: context.nonce,
+    numOfTokens: context.numOfTokens,
+    permitFundTxHash: null,
+    error: null,
+    result: null,
+  };
+  const signedBuyback = {
+    buyerWalletAddress: account.address,
+    cardPackId: packId,
+    buybackAuth: { buybackIds: [hash], token, amount: '1000' },
+    userSignature: `0x${'11'.repeat(65)}`,
+  };
+  const buybackRequest = {
+    requestId,
+    buyerWalletAddress: account.address.toLowerCase(),
+    cardPackId: packId,
+    settlementIds: [hash],
+    txHash: null,
+    totalAmountInUsdt: null,
+    itemCount: null,
+    error: null,
+  };
+  function stub(...responses: Response[]) {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      requests.push(new Request(input, init));
+      const response = responses.shift();
+      if (!response) throw new Error('Unexpected request');
+      return response;
+    });
+    vi.stubGlobal('fetch', fetch);
+    return { fetch, requests };
+  }
+
+  it('starts a pull once, with the builder key, and returns its request', async () => {
+    const { fetch, requests } = stub(
+      Response.json(
+        { ...pullRequest, status: 'PENDING_PAYMENT' },
+        { status: 202 },
+      ),
+    );
+    const pull = signed();
+    const started = value(await builderClient().startGachaPull({ pull }));
+    expect(started).toEqual({
+      requestId,
+      status: EoaPullRequestStatus.PendingPayment,
+      buyerWalletAddress: account.address.toLowerCase(),
+      packId,
+      nonce: context.nonce,
+      numOfTokens: 1,
+      permitFundTxHash: null,
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    const [request] = requests;
+    expect(request?.method).toBe('POST');
+    expect(new URL(request?.url ?? '').pathname).toBe('/v2/gacha/pull/request');
+    expect(request?.headers.get('x-builder-api-key')).toBe('test-builder');
+    expect(await request?.json()).toEqual(pull);
+  });
+
+  it('refuses a pull request that does not match the submitted pull', async () => {
+    stub(
+      Response.json(
+        { ...pullRequest, nonce: '999', status: 'PENDING_PAYMENT' },
+        { status: 202 },
+      ),
+    );
+    const result = await builderClient().startGachaPull({ pull: signed() });
+    expect(isFailed(result)).toBe(true);
+    if (isFailed(result)) {
+      expect(getError(result).code).toBe('INVALID_SCHEMA');
+      expect(isStartGachaPullError(getError(result))).toBe(true);
+      expect(getError(result).error).toEqual({ requestId });
+    }
+  });
+
+  it('reads a resolved pull with the same draws as draw status', async () => {
+    const { requests } = stub(
+      Response.json({
+        ...pullRequest,
+        status: 'RESOLVED',
+        permitFundTxHash: hash,
+        result: resolved,
+      }),
+    );
+    const status = value(
+      await builderClient().fetchGachaPullStatus({ requestId }),
+    );
+    if (status.status !== EoaPullRequestStatus.Resolved)
+      throw new Error('Expected a resolved pull');
+    expect(status.result.permitFundTxHash).toBe(hash);
+    expect(status.result.draws[0]?.collectible?.name).toBe('Pokémon');
+    expect(status.result.draws[0]?.buybackBonus?.bonusBps).toBe(2000);
+    const url = new URL(requests[0]?.url ?? '');
+    expect(url.pathname).toBe('/v2/gacha/pull/status');
+    expect(url.searchParams.get('requestId')).toBe(requestId);
+  });
+
+  it('reads a failed pull with its open-ended code', async () => {
+    stub(
+      Response.json({
+        ...pullRequest,
+        status: 'FAILED',
+        error: { code: 'OP_WALLET_BUSY', message: 'Try again shortly.' },
+      }),
+    );
+    const status = value(
+      await builderClient().fetchGachaPullStatus({ requestId }),
+    );
+    expect(status).toMatchObject({
+      status: EoaPullRequestStatus.Failed,
+      error: { code: 'OP_WALLET_BUSY', message: 'Try again shortly.' },
+    });
+  });
+
+  it('fails an unknown request id with the API status and refuses a malformed one', async () => {
+    const { fetch } = stub(
+      Response.json(
+        { error: 'Request not found', code: 'REQUEST_NOT_FOUND' },
+        { status: 404 },
+      ),
+    );
+    const unknown = await builderClient().fetchGachaPullStatus({ requestId });
+    expect(isFailed(unknown) && getError(unknown)).toMatchObject({
+      code: 'GACHA_V2_REQUEST_FAILED',
+      status: 404,
+    });
+    if (isFailed(unknown))
+      expect(isFetchGachaPullStatusError(getError(unknown))).toBe(true);
+    const malformed = await builderClient().fetchGachaBuybackStatus({
+      requestId: 'not-a-uuid',
+    });
+    expect(isFailed(malformed) && getError(malformed).code).toBe(
+      'WRONG_REQUEST_PARAMS',
+    );
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('starts a buyback and reads it until completed', async () => {
+    const { requests } = stub(
+      Response.json({ ...buybackRequest, status: 'PENDING' }, { status: 202 }),
+      Response.json({
+        ...buybackRequest,
+        status: 'COMPLETED',
+        txHash: hash,
+        totalAmountInUsdt: '1000',
+        itemCount: 1,
+      }),
+    );
+    const client = builderClient();
+    const started = value(await client.startGachaBuyback(signedBuyback));
+    expect(started).toEqual({
+      requestId,
+      status: EoaBuybackRequestStatus.Pending,
+      buyerWalletAddress: account.address.toLowerCase(),
+      cardPackId: packId,
+      settlementIds: [hash],
+    });
+    expect(
+      value(await client.fetchGachaBuybackStatus({ requestId })),
+    ).toMatchObject({
+      status: EoaBuybackRequestStatus.Completed,
+      txHash: hash,
+      totalAmountInUsdt: '1000',
+      itemCount: 1,
+    });
+    expect(
+      requests.map((request) => [
+        request.method,
+        new URL(request.url).pathname,
+      ]),
+    ).toEqual([
+      ['POST', '/v2/gacha/buyback/request'],
+      ['GET', '/v2/gacha/buyback/status'],
+    ]);
+    expect(await requests[0]?.json()).toEqual(signedBuyback);
+  });
+
+  it('reads the buyback bonus of a public pull', async () => {
+    stub(
+      Response.json({
+        pulls: [
+          {
+            tokenId: '42',
+            name: 'Riolu',
+            tier: 'S',
+            buybackBaseValueInUsd: '1200',
+            buybackBonus: {
+              originalBuybackBaseValueInUSD: '1000',
+              bonusBps: 2000,
+            },
+            frontImageUrl: 'https://test.example/front.png',
+            imageUrl: 'https://test.example/cutout.png',
+          },
+        ],
+        pagination: { limit: 20, offset: 0, hasMore: false },
+      }),
+    );
+    const page = value(
+      await builderClient()
+        .listGachaPullHistory({ slug: 'test-pack' })
+        .firstPage(),
+    );
+    expect(page.items[0]?.buybackBonus).toEqual({
+      originalBuybackBaseValueInUSD: '1000',
+      bonusBps: 2000,
+    });
   });
 });

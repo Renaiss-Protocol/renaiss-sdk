@@ -22,7 +22,7 @@ const expected = {
   packId: selectedMachine.id,
   onChainPackId: selectedMachine.onChainPackId,
   priceInUsdt: BigInt(selectedMachine.priceInUsdt),
-  quantity: 1 as const,
+  quantity: 1, // any whole number from 1 to MAX_GACHA_PULL_QUANTITY (10)
 };
 const preparation = await client.prepareGachaPull({
   buyerWalletAddress,
@@ -46,6 +46,35 @@ const result = await client.submitGachaPull({
   },
 });
 ```
+
+To submit without keeping a connection open (a serverless function, a mobile
+app sent to the background), use `startGachaPull` instead of `submitGachaPull`
+and poll its request:
+
+```ts
+const started = await client.startGachaPull({ pull: getValue(signature) });
+if (isFailed(started)) return handleError(getError(started));
+persistRequestId(getValue(started).requestId);
+
+// About once a second, until RESOLVED or FAILED.
+const status = await client.fetchGachaPullStatus({
+  requestId: getValue(started).requestId,
+});
+if (isFailed(status)) return handleError(getError(status));
+const request = getValue(status);
+if (request.status === EoaPullRequestStatus.Resolved) render(request.result.draws);
+if (request.status === EoaPullRequestStatus.Failed) showFailure(request.error); // never charged
+```
+
+`PENDING_PAYMENT` and `PENDING_RESOLUTION` mean poll again; once paid, a pull
+never becomes `FAILED`. Sending the same signed pull again returns the same
+`requestId` and never charges twice, and a `FAILED` request starts again. A
+pull still `PENDING_PAYMENT` after 10 minutes is being reconciled: stop polling,
+contact Renaiss with the `requestId` and do not sign a new pull for it. A
+request can be read for at least 30 days. `startGachaBuyback` and
+`fetchGachaBuybackStatus` do the same for a signed buyback (`PENDING`, then
+`COMPLETED` with `txHash`, `totalAmountInUsdt` and `itemCount`, or `FAILED`);
+each `startGachaBuyback` call is a new request.
 
 The SDK checks the network's contracts and fixed signing types both during
 preparation and immediately before signing. Keep `expected` bound to the user's
@@ -85,21 +114,141 @@ approval an explicit step, following [viem's typed-data signing interface](https
   context on disconnect, parse failure or consumer callback failure. The default
   stream deadline is 180 seconds; a supplied AbortSignal controls cancellation.
 - Persist a submission journal *before* submitting, and persist the funding hash
-  as soon as received. Recovery uses `fetchGachaDrawStatus` and `listWalletPulls`.
+  as soon as received. The stream's `pull_started` event carries a `requestId`;
+  a failed `submitGachaPull` returns it in `ApiError.error` with
+  `permitFundTxHash` and `fundingConfirmed` when known. Recovery uses
+  `fetchGachaPullStatus` (by `requestId`), `fetchGachaDrawStatus` (by funding
+  hash) and `listWalletPulls`.
   An empty history is not evidence that payment failed. A fresh nonce creates
   another purchase; never automatically retry a funding request.
-- Buybacks take 1–10 unique, unexpired offers from the same pack and contract.
-  Pass the chain and token from known deployment configuration or a previous
-  preparation, then `createGachaBuyback` and `submitGachaBuyback`. No NFT approval
-  is required. Offer expiry/delivery can race; refresh after a failed settlement.
+- Buybacks take 1–10 unique offers from the same pack and contract. Each offer
+  lists every buyback tier in `buybackTiers`, soonest end first. The price now
+  is the `amountInUsdt` of the first tier whose `expiresAt` has not passed;
+  `getEoaBuybackTierAt(offer, Date.now())` returns that tier, and
+  `getEoaBuybackOfferEndsAt(offer)` returns when the offer ends.
+  `createGachaBuyback` requires `expectedAmountInUsdt`, the total the user
+  confirmed in 18-decimal USDT units. It signs the sum of the current prices
+  only when that sum matches; otherwise it returns `WRONG_REQUEST_PARAMS`
+  before requesting a signature. Read the offers again, show the updated
+  amount and ask the user to confirm before trying again. It refuses an offer
+  whose tiers have all ended or whose current tier pays nothing. Pass the chain
+  and token from known deployment configuration or a previous preparation, then
+  `createGachaBuyback` and `submitGachaBuyback`. No NFT approval is required. If
+  a tier ends before the buyback reaches Renaiss, the API error is
+  `GACHA_V3_BUYBACK_PRICE_CHANGED`: read the offers again and sign again. Offer
+  expiry and delivery can race; refresh after a failed settlement.
+- A collectible can carry a buyback bonus. `buybackBonus` is
+  `{ originalBuybackBaseValueInUSD, bonusBps }` (2000 means +20%) or `null`.
+  The base buyback value next to it and every `buybackTiers` amount already
+  include the bonus: show it, but do not apply it again. It is on the reveal,
+  `fetchGachaDrawStatus`, `listWalletCollection` (in the buyback window) and
+  `listGachaPullHistory` (only when the read sends a builder key).
 
+
+## Wallet cards, totals and activities
+
+Three builder-key reads describe what a wallet has and did
+(`/v2/users/{walletAddress}`). The activities are the address's chain events
+with any builder. The cards and totals hold what it pulled with your builder
+key and the cards it owns that it did not pull itself. Exactly
+the address you give is read: an owner wallet and its Renaiss Safe are two
+wallets.
+
+```ts
+import { EoaActivityFilter, EoaCollectionSort, EoaSortOrder } from '@renaiss-protocol/client';
+
+const totals = await client.fetchWalletCollectionSummary({ walletAddress });
+// { collectibleCount: 10, totalRixPriceInUsd: '28559', collectiblesWithoutRixPrice: 0 }  (USD cents)
+
+const cards = await client
+  .listWalletCollection({
+    walletAddress,
+    sortBy: EoaCollectionSort.RixPrice, // PulledAt (default) | RixPrice | BuybackExpiry
+    sortOrder: EoaSortOrder.Descending, // the default
+    tokenIds: ['4739…'], // optional: only these cards (1 to 20)
+  })
+  .firstPage();
+
+for await (const page of client.listWalletActivities({
+  walletAddress,
+  filter: EoaActivityFilter.GachaV3Buyback, // omit for everything
+})) {
+  if (isFailed(page)) return handleError(getError(page));
+  render(getValue(page).items); // EoaActivity[]
+}
+```
+
+- A card the wallet pulled **with your builder key** is listed while Renaiss
+  holds it (its buyback window, then until delivery) and, once delivered,
+  while the wallet owns it on chain. A card the wallet owns on chain but did
+  not pull itself, such as a marketplace purchase or a transfer, is listed
+  with `pull: null`. A card the wallet pulled with another builder is never
+  listed, even after delivery, so the list and the totals of one address
+  differ between two builder keys. A card that was sold, sold back,
+  transferred away or redeemed is not listed; the activities have what
+  happened to it.
+- `state.status` says where the card is. `IN_WALLET`: the wallet owns it on
+  chain. `IN_BUYBACK_WINDOW` (your pulls only) carries `buybackBaseValueInUSD`
+  (USD cents, bonus included), `buybackBonus` and every `buybackTiers` entry,
+  past ones too, priced like `fetchGachaBuybackOffers`:
+  `getEoaBuybackTierAt(card.state, Date.now())` is the current tier. Sign
+  what the offers return, not these display prices. `AWAITING_DELIVERY` (your
+  pulls only): no buyback is offered and the card is not delivered yet.
+- `pull` is the wallet's pull of the card with your builder key (`packId`,
+  `packName`, `permitFundTxHash`, `pulledAt`). It is `null` for a card the
+  wallet got any other way. The settlement id is on `listWalletPulls` and the
+  reveal. Tier and base value are on the reveal's `draws[]` (`submitGachaPull`)
+  and on `fetchGachaDrawStatus`; retain them if you need them later.
+- `rixPriceInUsd` is the card's RIX price (its market value, as on
+  renaiss.xyz) in USD cents and moves with the market; it is `null` for a card
+  that has none yet, and `rixPriceUpdatedAt` is when it was last updated. The
+  summary's `totalRixPriceInUsd` adds the current prices, and
+  `collectiblesWithoutRixPrice` says how many counted cards add nothing yet.
+- `tokenIds` keeps only those cards (1 to 20 decimal strings) and applies before
+  sorting and paging, so `totalCount` counts only the matches. Sorting and
+  paging apply to the whole list on the server; there is no text search. A card
+  without the sorted value (no pull with your builder key, no RIX price, or no
+  open buyback window) sorts last in both directions. The cards page carries
+  `totalCount`.
+- Activities are the wallet's chain events, newest first, with an entry tied
+  to a pack your key cannot see left out; one
+  `EoaActivityType` each: `gacha-v3-pull`, `gacha-v3-buyback`,
+  `gacha-v3-release-token` (a delivery), marketplace `buy` and `sell`,
+  `transfer`, `mint` and `burn` (a redemption). Narrow on `type` to read an
+  entry's own fields. `item` is the catalog card (`tokenId`, `title`,
+  `subtitle`, `imageUrl`) of the token id an event names. A pull and a buyback
+  name no card, as on chain: a pull has its pack's on-chain id (`packId`, a
+  machine's `onChainPackId`), `checkoutIds` and `totalAmount` for the whole
+  payment, and a buyback its `buybackIds` (the `settlementId` of your own
+  draws) and `priceInUsdt` for the whole event.
+- Activities page by event using the API's cursor, with no total. A page holds
+  up to `pageSize` events (1 to 50); one transaction's entries can span pages.
+- A wallet Renaiss operates (its pack stock and the cards waiting for delivery)
+  reads as a wallet with nothing.
+- Every wallet card carries `frontImageUrl` (the graded slab in its Renaiss
+  frame, on a dark background) and `type` (`CollectibleType`). The reveal's
+  and `fetchGachaDrawStatus`'s `collectible` and the marketplace `fetchCard`
+  also carry `attributes`: a `{ key, value }` list in the order Grader, Grade,
+  Cert Number, Year, Set, Card Number, Character, Language, with empty values
+  left out. Read a wallet card's attributes with `fetchCard`.
+  `listGachaMachineContents` returns only `tokenId` (a decimal string),
+  `name`, `tier`, `buybackBaseValueInUsd`, `frontImageUrl` and `type`.
+  `listGachaPullHistory` also has `imageUrl`: the card cut out of its slab
+  photo, with no slab, grade label, frame or background. It is the catalog
+  photo, which can show another graded copy of the same card, and it is
+  `frontImageUrl` when there is no cutout.
 
 ## Interrupted purchases
 
 Record the wallet, chain, pack, quantity and submission time before sending a
 signed pull. When `payment_confirmed` arrives, persist `permitFundTxHash`.
 After a stream disconnect, use `fetchGachaDrawStatus` with that hash and the same
-wallet, then refresh history/offers. Do not purchase again just because an index
+wallet, or `fetchGachaPullStatus` with the `requestId` of `pull_started`, then
+refresh history/offers. A resolved draw there has the same fields as the
+reveal: `tier`, `buybackBaseValueInUSD`, `buybackBonus`, `buybackTiers` and
+`collectible`. The values, bonus and collectible are `null` when they could not
+be loaded; read again later. The payout is only on
+`fetchGachaBuybackOffers`. Do not purchase again just because an index
 has not caught up.
 
 The demo automatically checks a known funding hash immediately and then every

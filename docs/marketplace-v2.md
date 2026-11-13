@@ -55,7 +55,7 @@ fail locally before any request. Omit a range to browse all values.
 
 USDT values are strings of 18-decimal base units. USD values are integer cents.
 Keep them as `bigint` for arithmetic; never convert balances/prices through
-`Number`. Missing ask/FMV prices normalize to `null`.
+`Number`. Missing ask and RIX prices (`NO-ASK-PRICE`, `NO-RIX-PRICE`) normalize to `null`.
 
 ## Trading
 
@@ -73,8 +73,7 @@ client's selected `network.marketplace` (default `BNB_TESTNET`);
 `network: BNB_MAINNET` and `expectedChainId: BNB_MAINNET.chainId`.
 
 `buyCard` and `acceptBid` require `expectedTotalPriceInUsdt`, the price the UI displayed (use the selected bid's `amountInUsdt` when selling). The
-backend rejects a changed ask during preparation. Ask and bid expiries default
-to 30 days; pass `expiresAt` (ISO timestamp) or `expiresInSeconds`, up to 180 days.
+backend rejects a changed ask during preparation. For all four trades the SDK sends `expiresAt: null` for the 30-day default. Pass a UTC ISO timestamp ending in Z for a fixed expiry within 180 days. The API measures the 180-day limit on its own clock, so an expiry of exactly 180 days from the device's `Date.now()` fails whenever the device clock is even a second ahead of the API: the API returns a 400 `WRONG_REQUEST_PARAMS`, which the SDK reports as `MARKETPLACE_V2_REQUEST_FAILED`. When converting the maximum relative duration, leave a margin; the demo subtracts ten minutes from 180 days and leaves shorter durations exact. For listings supply the buyer total, including the fee. The SDK submits top-level `tokenId`, the prepared order data, and the signature; accepting a bid also sends the selected bid order ID.
 A standing bid must be at least 1 USDT.
 
 Bids and purchases require the EOA's USDT allowance to Permit2. Check the chain,
@@ -138,11 +137,11 @@ coordinated API deployment, SDK release, and documentation update.
 ## Amounts and signature expiry
 
 All SDK money inputs use `bigint` token base units, including `totalPriceInUsdt`,
-`sellerReceivesInUsdt`, `amountInUsdt` and `expectedTotalPriceInUsdt`. HTTP fields
+`amountInUsdt` and `expectedTotalPriceInUsdt`. HTTP fields
 remain decimal strings. Supply `baseUrl` explicitly for the selected network.
 
 Ask and bid signatures must match the exact requested `expiresAt`, rounded down
-to seconds, or stay within `expiresInSeconds` (default 30 days) plus 120 seconds
+to seconds, or stay within the 30-day default plus 120 seconds
 of clock tolerance from preparation. The SDK checks the payload and typed data
 before signing. Off-chain cancellation does not revoke an on-chain signature.
 

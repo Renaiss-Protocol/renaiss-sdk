@@ -1,5 +1,29 @@
 # @renaiss-protocol/client
 
+## 0.1.0-beta.5
+
+### Breaking changes
+
+- For v2 trading, list with the fee-inclusive `totalPriceInUsdt`. Read seller proceeds from the returned quote. Pass a UTC `expiresAt` for a fixed expiry or `null` for 30 days; the SDK sends explicit null when the option is omitted. Convert relative durations to an absolute timestamp before calling the SDK. The API checks the 180-day maximum against its own clock, so leave a margin below 180 days (for example ten minutes) when converting the longest duration; otherwise a device clock running ahead makes the request fail. Signed trade submissions use the on-chain token ID. Pair this client with the matching API release.
+- Redemption orders return `collectibles` instead of `cards` on `listRedemptionOrders`, `fetchRedemptionOrder` and `syncRedemptionTracking`.
+- `CardDetail` (`fetchCard`) has `type` and an `attributes` list of `{ key, value }` instead of `setName`, `cardNumber`, `pokemonName`, `gradingCompany`, `grade` and `year`. `frontWithoutStandImageUrl` is removed.
+- In the `submitGachaPull` result, `tier` and `buybackBaseValueInUSD` move from `draws[].collectible` to `draws[]`. `snapshotBuybackValueInUsdt` is removed; read the payout from `fetchGachaBuybackOffers`. The drawn `collectible` has `type`, `name`, `frontImageUrl` and `attributes`, and no longer has `imageUrl`.
+- `EoaMachine` and `EoaMachineDetail` no longer have `featuredCardFmvInUsd`. `EoaMachineDetail` replaces `buybackPercentage` and `buybackWindowSeconds` with `buybackConfig`, a list of `{ buybackPercentage, buybackExpiredInSeconds }` tiers, earliest end first.
+- `EoaBuybackOffer` replaces `amountInUsdt` and `expiresAt` with `buybackTiers`, a list of `{ buybackPercentage, amountInUsdt, expiresAt }` tiers, earliest end first. Expired tiers stay in the list; `getEoaBuybackTierAt` returns the current one.
+- `createGachaBuyback` requires `expectedAmountInUsdt`, the total the user confirmed. It signs the current tier's price, and returns `WRONG_REQUEST_PARAMS` before signing if that total differs or an offer pays nothing now.
+- A buyback whose price changed before it reached Renaiss fails with `GACHA_V3_BUYBACK_PRICE_CHANGED` (HTTP 409); before, it failed with `GACHA_V3_BUYBACK_VERIFY_FAILED` (HTTP 400). Read the offers again and sign again.
+- `GachaQuantity` is removed. `prepareGachaPull` and `signGachaPull` take any whole number from 1 to `MAX_GACHA_PULL_QUANTITY` (10): replace `GachaQuantity.Five` with `5`.
+
+### Additions
+
+- Add builder-key reads `listWalletCollection`, `fetchWalletCollectionSummary` and `listWalletActivities`, which take `{ walletAddress }`. The collection holds the cards the wallet pulled with your builder key and the cards it owns on chain that it did not pull itself. `listWalletCollection` can filter by up to 20 `tokenIds`. Cards in the `IN_BUYBACK_WINDOW` state carry `buybackBaseValueInUSD`, `buybackBonus` and `buybackTiers`.
+- With `builderApiKey` set, `listGachaMachines`, `fetchGachaMachine`, `listGachaMachineContents` and `listGachaPullHistory` send the key and also return the machines open only to your builder.
+- `EoaMachineContent` adds `tokenId` and `type`. `listGachaMachineContents` takes `tiers` to return only those tiers.
+- `listGachaPullHistory` entries add `imageUrl`, the card cut out of its slab photo, or `frontImageUrl` when there is no cutout.
+- Add `startGachaPull` and `fetchGachaPullStatus` to submit a signed pull without a stream and poll it by `requestId` until it is `RESOLVED` or `FAILED`. Submitting the same signed pull again returns the same request. `startGachaBuyback` and `fetchGachaBuybackStatus` do the same for a buyback, but each submission creates a new request.
+- The stream's `pull_started` event carries `requestId`, and a failed `submitGachaPull` returns it in `ApiError.error`, so you can recover with `fetchGachaPullStatus`.
+- `fetchGachaDrawStatus` returns `EoaDrawStatus`: each draw has `tier`, `buybackBaseValueInUSD` and `collectible`, or `null` when they could not be loaded. Draws also carry `buybackBonus` and `buybackTiers`. Buyback values and tier amounts already include the bonus: do not apply it again.
+
 ## 0.1.0-beta.4
 
 ### Patch Changes

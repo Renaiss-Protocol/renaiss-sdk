@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   CardAttributeSchema,
+  CollectibleType,
   MarketplaceOrderSchema,
   MarketplaceOrderStatus,
   MarketplacePaginationSchema,
@@ -11,33 +12,34 @@ import { addressSchema, numericStringSchema } from './wallet';
 
 const wireCard = z.object({
   tokenId: numericStringSchema,
+  type: z.enum(CollectibleType),
   name: z.string(),
-  setName: z.string(),
-  cardNumber: z.string(),
-  pokemonName: z.string(),
   ownerAddress: addressSchema,
   askPriceInUSDT: z.union([numericStringSchema, z.literal('NO-ASK-PRICE')]),
   askExpiresAt: z.string().nullish(),
-  fmvPriceInUSD: z.union([numericStringSchema, z.literal('NO-FMV-PRICE')]),
-  fmvUpdatedAt: z.string().nullish(),
+  rixPriceInUsd: z.union([numericStringSchema, z.literal('NO-RIX-PRICE')]),
+  rixPriceUpdatedAt: z.string().nullish(),
   frontImageUrl: z.string(),
+  /** Grader, Grade, Cert Number, Year, Set, Card Number, Character, Language, in that order; empty ones are left out. */
   attributes: z.array(CardAttributeSchema),
-  gradingCompany: z.string(),
-  grade: z.string(),
-  year: z.number(),
   owner: z
     .object({ username: z.string(), image: z.string().optional() })
     .nullable(),
 });
 function normalizeCard(card: z.infer<typeof wireCard>) {
-  const { askPriceInUSDT, fmvPriceInUSD, askExpiresAt, fmvUpdatedAt, ...rest } =
-    card;
+  const {
+    askPriceInUSDT,
+    rixPriceInUsd,
+    askExpiresAt,
+    rixPriceUpdatedAt,
+    ...rest
+  } = card;
   return {
     ...rest,
     askPriceInUsdt: askPriceInUSDT === 'NO-ASK-PRICE' ? null : askPriceInUSDT,
-    fmvPriceInUsd: fmvPriceInUSD === 'NO-FMV-PRICE' ? null : fmvPriceInUSD,
+    rixPriceInUsd: rixPriceInUsd === 'NO-RIX-PRICE' ? null : rixPriceInUsd,
     askExpiresAt: askExpiresAt ?? null,
-    fmvUpdatedAt: fmvUpdatedAt ?? null,
+    rixPriceUpdatedAt: rixPriceUpdatedAt ?? null,
   };
 }
 /** V2 tiles include their display image. USD is cents; USDT is 18-decimal base units. */
@@ -47,16 +49,18 @@ const MarketplaceCardV2Schema = wireCard
     name: true,
     ownerAddress: true,
     askPriceInUSDT: true,
-    fmvPriceInUSD: true,
-    fmvUpdatedAt: true,
+    rixPriceInUsd: true,
+    rixPriceUpdatedAt: true,
     frontImageUrl: true,
   })
-  .transform(({ askPriceInUSDT, fmvPriceInUSD, fmvUpdatedAt, ...card }) => ({
-    ...card,
-    askPriceInUsdt: askPriceInUSDT === 'NO-ASK-PRICE' ? null : askPriceInUSDT,
-    fmvPriceInUsd: fmvPriceInUSD === 'NO-FMV-PRICE' ? null : fmvPriceInUSD,
-    fmvUpdatedAt: fmvUpdatedAt ?? null,
-  }));
+  .transform(
+    ({ askPriceInUSDT, rixPriceInUsd, rixPriceUpdatedAt, ...card }) => ({
+      ...card,
+      askPriceInUsdt: askPriceInUSDT === 'NO-ASK-PRICE' ? null : askPriceInUSDT,
+      rixPriceInUsd: rixPriceInUsd === 'NO-RIX-PRICE' ? null : rixPriceInUsd,
+      rixPriceUpdatedAt: rixPriceUpdatedAt ?? null,
+    }),
+  );
 export type MarketplaceCardV2 = z.infer<typeof MarketplaceCardV2Schema>;
 export const MarketplaceCardsV2ResponseSchema = z.object({
   collection: z.array(MarketplaceCardV2Schema),
@@ -66,7 +70,6 @@ export const CardDetailV2Schema = z
   .object({
     collectible: wireCard.extend({
       backImageUrl: z.string().nullish(),
-      frontWithoutStandImageUrl: z.string().nullish(),
     }),
     pricing: z.object({
       top_offer: PriceSchema.nullable(),
@@ -79,7 +82,6 @@ export const CardDetailV2Schema = z
   .transform(({ collectible, pricing }) => ({
     ...normalizeCard(collectible),
     backImageUrl: collectible.backImageUrl ?? null,
-    frontWithoutStandImageUrl: collectible.frontWithoutStandImageUrl ?? null,
     pricing: {
       topBid: pricing.top_offer,
       lastSale: pricing.last_sale,

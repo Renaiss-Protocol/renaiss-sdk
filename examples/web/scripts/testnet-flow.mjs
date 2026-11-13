@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   createGachaClient,
+  getEoaBuybackTierAt,
   getError,
   getValue,
   isFailed,
@@ -193,12 +194,15 @@ const offers = value(
 );
 const offer = offers.find((o) => o.settlementId === pull.draws[0].settlementId);
 assert(offer, 'Resolved draw should have a current buyback offer');
+const buybackTier = getEoaBuybackTierAt(offer, Date.now());
+assert(buybackTier, 'Resolved draw should have a current buyback tier');
 const buyback = value(
   await sdk.createGachaBuyback({
     buyerWalletAddress: account.address,
     offers: [offer],
     chainId: prepared.chainId,
     token,
+    expectedAmountInUsdt: buybackTier.amountInUsdt,
   }),
 );
 const payout = value(await sdk.submitGachaBuyback(buyback));

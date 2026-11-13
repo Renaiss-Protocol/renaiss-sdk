@@ -72,6 +72,9 @@ export const V2_FETCH_GACHA_MACHINE_ERROR_CODES = v2ReadCodes;
 export const V2_LIST_GACHA_MACHINE_CONTENTS_ERROR_CODES = v2ReadCodes;
 export const V2_LIST_GACHA_PULL_HISTORY_ERROR_CODES = v2ReadCodes;
 export const V2_LIST_WALLET_PULLS_ERROR_CODES = v2ReadCodes;
+export const V2_LIST_WALLET_COLLECTION_ERROR_CODES = v2ReadCodes;
+export const V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES = v2ReadCodes;
+export const V2_LIST_WALLET_ACTIVITIES_ERROR_CODES = v2ReadCodes;
 export const V2_FETCH_GACHA_DRAW_STATUS_ERROR_CODES = v2ReadCodes;
 export const V2_FETCH_GACHA_BUYBACK_OFFERS_ERROR_CODES = v2ReadCodes;
 export const V2_PREPARE_GACHA_PULL_ERROR_CODES = [
@@ -91,6 +94,10 @@ export const V2_CREATE_GACHA_BUYBACK_ERROR_CODES = [
   'GACHA_SIGNING_FAILED',
 ] as const;
 export const V2_SUBMIT_GACHA_BUYBACK_ERROR_CODES = v2ReadCodes;
+export const V2_START_GACHA_PULL_ERROR_CODES = v2ReadCodes;
+export const V2_FETCH_GACHA_PULL_STATUS_ERROR_CODES = v2ReadCodes;
+export const V2_START_GACHA_BUYBACK_ERROR_CODES = v2ReadCodes;
+export const V2_FETCH_GACHA_BUYBACK_STATUS_ERROR_CODES = v2ReadCodes;
 export type V2ListGachaMachinesErrorCode =
   (typeof V2_LIST_GACHA_MACHINES_ERROR_CODES)[number];
 export type V2FetchGachaMachineErrorCode =
@@ -101,6 +108,12 @@ export type V2ListGachaPullHistoryErrorCode =
   (typeof V2_LIST_GACHA_PULL_HISTORY_ERROR_CODES)[number];
 export type V2ListWalletPullsErrorCode =
   (typeof V2_LIST_WALLET_PULLS_ERROR_CODES)[number];
+export type V2ListWalletCollectionErrorCode =
+  (typeof V2_LIST_WALLET_COLLECTION_ERROR_CODES)[number];
+export type V2FetchWalletCollectionSummaryErrorCode =
+  (typeof V2_FETCH_WALLET_COLLECTION_SUMMARY_ERROR_CODES)[number];
+export type V2ListWalletActivitiesErrorCode =
+  (typeof V2_LIST_WALLET_ACTIVITIES_ERROR_CODES)[number];
 export type V2FetchGachaDrawStatusErrorCode =
   (typeof V2_FETCH_GACHA_DRAW_STATUS_ERROR_CODES)[number];
 export type V2FetchGachaBuybackOffersErrorCode =
@@ -115,6 +128,14 @@ export type V2CreateGachaBuybackErrorCode =
   (typeof V2_CREATE_GACHA_BUYBACK_ERROR_CODES)[number];
 export type V2SubmitGachaBuybackErrorCode =
   (typeof V2_SUBMIT_GACHA_BUYBACK_ERROR_CODES)[number];
+export type V2StartGachaPullErrorCode =
+  (typeof V2_START_GACHA_PULL_ERROR_CODES)[number];
+export type V2FetchGachaPullStatusErrorCode =
+  (typeof V2_FETCH_GACHA_PULL_STATUS_ERROR_CODES)[number];
+export type V2StartGachaBuybackErrorCode =
+  (typeof V2_START_GACHA_BUYBACK_ERROR_CODES)[number];
+export type V2FetchGachaBuybackStatusErrorCode =
+  (typeof V2_FETCH_GACHA_BUYBACK_STATUS_ERROR_CODES)[number];
 
 const v2MarketplaceReadCodes = [
   'WRONG_REQUEST_PARAMS',

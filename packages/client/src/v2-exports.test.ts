@@ -6,6 +6,8 @@ import type {
   BuyCardResult,
   CreateAskResult,
   CreateBidResult,
+  EoaBuybackRequest,
+  EoaPullRequest,
   GachaClient,
   MarketplaceCancellation,
   MarketplaceClient,
@@ -35,6 +37,18 @@ it('exports named result models for every v2 trading method', () => {
   expectTypeOf<GachaClient>()
     .toHaveProperty('submitGachaBuyback')
     .returns.toEqualTypeOf<Promise<Result<SubmitGachaBuybackResponse>>>();
+  expectTypeOf<GachaClient>()
+    .toHaveProperty('startGachaPull')
+    .returns.toEqualTypeOf<Promise<Result<EoaPullRequest>>>();
+  expectTypeOf<GachaClient>()
+    .toHaveProperty('fetchGachaPullStatus')
+    .returns.toEqualTypeOf<Promise<Result<EoaPullRequest>>>();
+  expectTypeOf<GachaClient>()
+    .toHaveProperty('startGachaBuyback')
+    .returns.toEqualTypeOf<Promise<Result<EoaBuybackRequest>>>();
+  expectTypeOf<GachaClient>()
+    .toHaveProperty('fetchGachaBuybackStatus')
+    .returns.toEqualTypeOf<Promise<Result<EoaBuybackRequest>>>();
   expectTypeOf<CreateAskResult>().toExtend<MarketplaceOrderResult>();
   expectTypeOf<CreateBidResult>()
     .toHaveProperty('quote')

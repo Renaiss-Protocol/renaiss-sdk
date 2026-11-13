@@ -3,7 +3,7 @@
 Build gacha, marketplace and physical-card redemption into your application with
 `@renaiss-protocol/client`.
 
-The SDK is in beta (`0.1.0-beta.4`) and supports the v2 HTTP API. Beta versions
+The SDK is in beta (`0.1.0-beta.5`) and supports the v2 HTTP API. Beta versions
 are published to the `beta` npm tag. See the
 [beta migration guide](docs/migration-beta.md) if you used the earlier alpha.
 
@@ -75,13 +75,13 @@ purchases, recovery, mainnet availability and optional funded testnet scripts.
 
 `pnpm build`, `pnpm test`, `pnpm lint` and `pnpm typecheck` validate the workspace.
 Build dependencies before checking consumers of their packaged `dist` exports.
-See [SDK architecture](docs/sdk-direction.md) for contributor conventions.
+See [SDK architecture](docs/sdk-direction.md) for package structure and workflows.
 
 ## Releases
 
-Changesets record release notes and version changes. The release workflow opens
-a version PR; the separately approved tag workflow publishes the client package.
-Prereleases use the `beta` npm dist-tag. The root entry now exposes EOA clients
+Prereleases use the `beta` npm dist-tag. See the
+[changelog](packages/client/CHANGELOG.md) for release notes.
+The root entry now exposes EOA clients
 and no longer exports the alpha's v1/Safe clients. This is a breaking prerelease
 change; migrate the signing and credential flow before updating an alpha
 integration. The [migration guide](docs/migration-beta.md) covers both alpha
@@ -89,7 +89,7 @@ consumers and replacing the removed `/v2` package subpath with root imports.
 The HTTP API version does not set the npm package's major version.
 
 Pin an existing alpha version exactly while migrating: `^0.1.0-alpha.2` also
-matches `0.1.0-beta.4`. The migration guide includes an exact-version install.
+matches `0.1.0-beta.5`. The migration guide includes an exact-version install.
 
 Report bugs and integration feedback through this repository's issues. Do not
 include API keys, wallet access tokens, refresh tokens, private keys or shipping details in public reports.

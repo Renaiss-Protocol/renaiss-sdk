@@ -110,7 +110,7 @@ const created = value(
   await client.createBid({
     tokenId: card.tokenId,
     amountInUsdt: bidAmount,
-    expiresInSeconds: 300,
+    expiresAt: new Date(Date.now() + 300_000).toISOString(),
   }),
 );
 report.orderId = created.orderId;

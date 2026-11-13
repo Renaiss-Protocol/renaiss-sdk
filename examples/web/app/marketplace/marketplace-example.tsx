@@ -38,6 +38,7 @@ import {
   serializeState,
   toListRequest,
 } from './filters';
+import { offerExpiresAt } from './helpers';
 import styles from './marketplace.module.css';
 import {
   CHAIN_ID,
@@ -45,6 +46,7 @@ import {
   createMarketplaceTrader,
   type MarketplaceTrader,
 } from './marketplace-client';
+import { refreshTradeOwner } from './trade-refresh';
 import {
   AcceptOfferDialog,
   BuyNowDialog,
@@ -296,9 +298,9 @@ export function MarketplaceExample({
 
   // Detail + live orders for the open card.
   const loadDetail = useCallback(
-    async (id: string) => {
+    async (id: string, quiet = false) => {
       const seq = ++detailSeq.current;
-      setDetailLoading(true);
+      if (!quiet) setDetailLoading(true);
       const [detailResult, ordersResult] = await Promise.all([
         reader.fetchCard({ tokenId: id }),
         reader.fetchCardOrders({ tokenId: id }),
@@ -322,6 +324,7 @@ export function MarketplaceExample({
         setOrders(getValue(ordersResult));
         record('fetchCardOrders()', getValue(ordersResult));
       }
+      return card.ownerAddress;
     },
     [reader, record],
   );
@@ -339,6 +342,7 @@ export function MarketplaceExample({
     }
     void loadDetail(tokenId);
     return () => {
+      selectedToken.current = null;
       detailSeq.current++;
     };
   }, [tokenId, loadDetail]);
@@ -539,8 +543,31 @@ export function MarketplaceExample({
     if (!token) throw new Error('Connect a wallet to trade.');
     return () => scope.isCurrent(token);
   }
-  async function afterTrade(id: string) {
-    if (selectedToken.current === id) await loadDetail(id);
+  async function afterTrade(
+    id: string,
+    expectedOwner?: string,
+    live: () => boolean = () => true,
+  ) {
+    const current = () => selectedToken.current === id && live();
+    if (expectedOwner) {
+      const refreshed = await refreshTradeOwner({
+        expectedOwner,
+        readOwner: () => loadDetail(id, true),
+        isCurrent: current,
+        onPending: () => note('Trade completed. Updating card ownership...'),
+      });
+      if (!current()) return;
+      if (refreshed === 'updated') {
+        note('Trade completed. Card ownership updated.');
+      } else {
+        note(
+          'Trade completed, but card details have not refreshed yet. Refresh the page shortly.',
+        );
+      }
+    } else if (current()) {
+      await loadDetail(id);
+    }
+    if (!current()) return;
     loadedKey.current = null;
     setFilters((previous) => ({ ...previous }));
     if (wallet) await refreshFunds(wallet);
@@ -564,7 +591,11 @@ export function MarketplaceExample({
         : `Buy order ${trade.orderId} is ${trade.status.toLowerCase()}.`,
     );
     if (live()) setDialog(null);
-    await afterTrade(card.tokenId);
+    await afterTrade(
+      card.tokenId,
+      trade.executed ? wallet?.account : undefined,
+      live,
+    );
   }
 
   async function offer(
@@ -578,7 +609,7 @@ export function MarketplaceExample({
     const result = await requireTrader().createBid({
       tokenId: card.tokenId,
       amountInUsdt: BigInt(amountInUsdt.toString()),
-      expiresInSeconds,
+      expiresAt: offerExpiresAt(expiresInSeconds, Date.now()).toISOString(),
     });
     if (live()) record('createBid()', result);
     if (isFailed(result)) throw new Error(describe(getError(result)));
@@ -589,15 +620,19 @@ export function MarketplaceExample({
         : `Offer placed for $${usdt(bid.quote.amountInUsdt, 18)}, expires ${new Date(bid.quote.expiresAt).toLocaleString()}.`,
     );
     if (live()) setDialog(null);
-    await afterTrade(card.tokenId);
+    await afterTrade(
+      card.tokenId,
+      bid.executed ? wallet?.account : undefined,
+      live,
+    );
   }
 
-  async function list(card: CardDetail, sellerReceivesInUsdt: bigint) {
+  async function list(card: CardDetail, totalPriceInUsdt: bigint) {
     const live = walletLive();
     note('Sign the listing in your wallet...');
     const result = await requireTrader().createAsk({
       tokenId: card.tokenId,
-      sellerReceivesInUsdt: BigInt(sellerReceivesInUsdt.toString()),
+      totalPriceInUsdt,
     });
     if (live()) record('createAsk()', result);
     if (isFailed(result)) throw new Error(describe(getError(result)));
@@ -635,7 +670,11 @@ export function MarketplaceExample({
       `Sold ${card.name} for $${usdt(sale.quote.amountInUsdt, 18)}; you receive $${usdt(sale.quote.sellerReceivesInUsdt, 18)}.`,
     );
     if (live()) setDialog(null);
-    await afterTrade(card.tokenId);
+    await afterTrade(
+      card.tokenId,
+      sale.executed ? bid.ownerAddress : undefined,
+      live,
+    );
   }
 
   function open(id: string | null) {

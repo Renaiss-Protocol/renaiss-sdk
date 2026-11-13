@@ -65,7 +65,7 @@ export enum MarketplaceV2Sort {
   Year = 'year',
   Price = 'priceRange',
   AskPrice = 'askPriceInUSDT',
-  FmvPrice = 'fmvPriceInUsd',
+  RixPrice = 'rixPriceInUsd',
 }
 export enum MarketplaceLanguage {
   English = 'English',
@@ -206,7 +206,7 @@ export function fetchCardV2(
   if (!parsed.success)
     return async () => invalid('Invalid token ID', parsed.error);
   return pipe(
-    ctx.service.get('/v2/marketplace/cards/{tokenId}', {
+    ctx.service.get('/v2/marketplace/collectibles/{tokenId}', {
       path: parsed.data,
       signal: request.signal,
     }),
@@ -223,7 +223,7 @@ export function fetchCardOrdersV2(
   if (!parsed.success)
     return async () => invalid('Invalid token ID', parsed.error);
   return pipe(
-    ctx.service.get('/v2/marketplace/cards/{tokenId}/orders', {
+    ctx.service.get('/v2/marketplace/collectibles/{tokenId}/orders', {
       path: parsed.data,
       signal: request.signal,
     }),
@@ -246,39 +246,26 @@ const expiry = {
     .refine(
       (at) => Date.parse(at) <= Date.now() + MAX_ORDER_EXPIRY_SECONDS * 1000,
     )
-    .optional(),
-  expiresInSeconds: z
-    .number()
-    .int()
-    .positive()
-    .max(MAX_ORDER_EXPIRY_SECONDS)
-    .optional(),
+    .nullable()
+    .default(null),
 };
 const askRequest = tokenRequest
+  .extend({ ...expiry, totalPriceInUsdt: positiveAmount })
+  .strict();
+const bidRequest = tokenRequest
+  .extend({ ...expiry, amountInUsdt: positiveAmount })
+  .strict();
+const buyRequest = tokenRequest
+  .extend({ ...expiry, expectedTotalPriceInUsdt: positiveAmount })
+  .strict();
+const sellRequest = tokenRequest
   .extend({
     ...expiry,
-    totalPriceInUsdt: positiveAmount.optional(),
-    sellerReceivesInUsdt: positiveAmount.optional(),
+    bidId: z.string().uuid(),
+    /** Total bid price the seller reviewed, in token base units. */
+    expectedTotalPriceInUsdt: positiveAmount,
   })
-  .refine(
-    (i) =>
-      (i.totalPriceInUsdt !== undefined) !==
-      (i.sellerReceivesInUsdt !== undefined),
-  );
-const bidRequest = tokenRequest.extend({
-  ...expiry,
-  amountInUsdt: positiveAmount,
-});
-const buyRequest = tokenRequest.extend({
-  ...expiry,
-  expectedTotalPriceInUsdt: positiveAmount,
-});
-const sellRequest = tokenRequest.extend({
-  ...expiry,
-  bidId: z.string().uuid(),
-  /** Total bid price the seller reviewed, in token base units. */
-  expectedTotalPriceInUsdt: positiveAmount,
-});
+  .strict();
 export type EoaCreateAskRequest = z.input<typeof askRequest> & {
   signal?: AbortSignal;
 };
@@ -429,30 +416,20 @@ async function sign(
     );
   }
 }
-function validExpiry(request: {
-  expiresAt?: string;
-  expiresInSeconds?: number;
-}) {
-  return (
-    request.expiresAt === undefined || request.expiresInSeconds === undefined
-  );
-}
-type RequestedExpiry = { expiresAt?: string; expiresInSeconds?: number };
 function requestedExpiryError(
   deadline: string,
-  request: RequestedExpiry,
+  request: { expiresAt: string | null },
   preparedAt: number,
 ): string | undefined {
   if (!/^\d+$/.test(deadline)) return 'Prepared order deadline is invalid.';
   const actual = BigInt(deadline);
   if (actual <= BigInt(Math.floor(Date.now() / 1000)))
     return 'The signing window expired; prepare the order again. An existing token approval remains valid. If this happens immediately, your device clock may be ahead; sync its date and time.';
-  if (request.expiresAt !== undefined)
+  if (request.expiresAt !== null)
     return actual === BigInt(Math.floor(Date.parse(request.expiresAt) / 1000))
       ? undefined
       : 'Prepared order expiry differs from the requested expiry. Review the expiry and prepare again.';
-  return actual <=
-    BigInt(preparedAt + (request.expiresInSeconds ?? 30 * 86400) + 120)
+  return actual <= BigInt(preparedAt + 30 * 86400 + 120)
     ? undefined
     : 'Permit deadline is outside the allowed window. Check the device clock, then prepare the order again.';
 }
@@ -477,9 +454,11 @@ export function createAskV2(
   request: EoaCreateAskRequest,
 ): Action<CreateAskResult> {
   return async () => {
-    const parsed = askRequest.safeParse(request);
-    if (!parsed.success || !validExpiry(parsed.data))
+    if (typeof request !== 'object' || request === null)
       return invalid('Invalid ask request');
+    const { signal, ...input } = request;
+    const parsed = askRequest.safeParse(input);
+    if (!parsed.success) return invalid('Invalid ask request');
     const who = await signerAddress(ctx);
     if (isFailed(who)) return who;
     const walletAddress = getValue(who);
@@ -489,7 +468,7 @@ export function createAskV2(
         ctx.service.post('/v2/marketplace/asks/prepare', {
           body: { ...parsed.data, walletAddress },
           builderAuth: ctx.builderAuth,
-          signal: request.signal,
+          signal,
         }),
         TE.mapLeft(normalizeApiFailure),
         TE.chainW(validateWith(PrepareAskResponseSchema)),
@@ -498,16 +477,8 @@ export function createAskV2(
     if (isFailed(prepared)) return prepared;
     const p = getValue(prepared);
     const feeBps = BigInt(ctx.config.platformFeeBps);
-    const total =
-      parsed.data.totalPriceInUsdt !== undefined
-        ? BigInt(parsed.data.totalPriceInUsdt)
-        : (BigInt(parsed.data.sellerReceivesInUsdt ?? '0') *
-            (10000n + feeBps)) /
-          10000n;
-    const net =
-      parsed.data.sellerReceivesInUsdt !== undefined
-        ? BigInt(parsed.data.sellerReceivesInUsdt)
-        : (total * 10000n) / (10000n + feeBps);
+    const total = BigInt(parsed.data.totalPriceInUsdt);
+    const net = (total * 10000n) / (10000n + feeBps);
     const deadlineError = requestedExpiryError(
       p.payload.askData.deadline,
       parsed.data,
@@ -524,11 +495,7 @@ export function createAskV2(
       p.payload.askData.tokenId !== parsed.data.tokenId ||
       p.payload.askData.usdcAmount !== p.quote.totalPriceInUsdt ||
       p.typedData.primaryType !== 'Ask' ||
-      !matchesMessage(p.typedData.message, p.payload.askData) ||
-      (parsed.data.totalPriceInUsdt !== undefined &&
-        parsed.data.totalPriceInUsdt !== p.quote.totalPriceInUsdt) ||
-      (parsed.data.sellerReceivesInUsdt !== undefined &&
-        parsed.data.sellerReceivesInUsdt !== p.quote.sellerReceivesInUsdt)
+      !matchesMessage(p.typedData.message, p.payload.askData)
     )
       return invalid('Prepared ask does not match the request');
     const signature = await sign(ctx, walletAddress, p.typedData);
@@ -536,9 +503,13 @@ export function createAskV2(
     const result = await run(
       pipe(
         ctx.service.post('/v2/marketplace/asks', {
-          body: { ...p.payload, askSignature: getValue(signature) },
+          body: {
+            tokenId: p.tokenId,
+            askData: p.payload.askData,
+            askSignature: getValue(signature),
+          },
           builderAuth: ctx.builderAuth,
-          signal: request.signal,
+          signal,
         }),
         TE.mapLeft(normalizeApiFailure),
         TE.chainW(validateWith(MarketplaceOrderResultSchema)),
@@ -554,12 +525,14 @@ async function executeBid(
   request: EoaCreateBidRequest | EoaBuyCardRequest,
   operation: 'bid' | 'buy',
 ): Promise<Result<CreateBidResult | BuyCardResult>> {
+  if (typeof request !== 'object' || request === null)
+    return invalid('Invalid bid or buy request');
+  const { signal, ...input } = request;
   const parsed =
     operation === 'bid'
-      ? bidRequest.safeParse(request)
-      : buyRequest.safeParse(request);
-  if (!parsed.success || !validExpiry(parsed.data))
-    return invalid('Invalid bid or buy request');
+      ? bidRequest.safeParse(input)
+      : buyRequest.safeParse(input);
+  if (!parsed.success) return invalid('Invalid bid or buy request');
   const who = await signerAddress(ctx);
   if (isFailed(who)) return who;
   const walletAddress = getValue(who);
@@ -573,7 +546,7 @@ async function executeBid(
         {
           body: { ...parsed.data, walletAddress },
           builderAuth: ctx.builderAuth,
-          signal: request.signal,
+          signal,
         },
       ),
       TE.mapLeft(normalizeApiFailure),
@@ -617,9 +590,13 @@ async function executeBid(
       ctx.service.post(
         operation === 'bid' ? '/v2/marketplace/bids' : '/v2/marketplace/buy',
         {
-          body: { ...p.payload, bidSignature: getValue(signature) },
+          body: {
+            tokenId: p.tokenId,
+            bidData: p.payload.bidData,
+            bidSignature: getValue(signature),
+          },
           builderAuth: ctx.builderAuth,
-          signal: request.signal,
+          signal,
         },
       ),
       TE.mapLeft(normalizeApiFailure),
@@ -650,9 +627,11 @@ export function acceptBidV2(
   request: EoaAcceptBidRequest,
 ): Action<AcceptBidResult> {
   return async () => {
-    const parsed = sellRequest.safeParse(request);
-    if (!parsed.success || !validExpiry(parsed.data))
+    if (typeof request !== 'object' || request === null)
       return invalid('Invalid bid acceptance');
+    const { signal, ...fields } = request;
+    const parsed = sellRequest.safeParse(fields);
+    if (!parsed.success) return invalid('Invalid bid acceptance');
     const who = await signerAddress(ctx);
     if (isFailed(who)) return who;
     const walletAddress = getValue(who);
@@ -663,7 +642,7 @@ export function acceptBidV2(
         ctx.service.post('/v2/marketplace/sell/prepare', {
           body: { ...input, bidOrderId: bidId, walletAddress },
           builderAuth: ctx.builderAuth,
-          signal: request.signal,
+          signal,
         }),
         TE.mapLeft(normalizeApiFailure),
         TE.chainW(validateWith(PrepareAcceptBidResponseSchema)),
@@ -700,9 +679,14 @@ export function acceptBidV2(
     const result = await run(
       pipe(
         ctx.service.post('/v2/marketplace/sell', {
-          body: { ...p.payload, askSignature: getValue(signature) },
+          body: {
+            tokenId: p.tokenId,
+            askData: p.payload.askData,
+            bidOrderId: p.payload.bidOrderId,
+            askSignature: getValue(signature),
+          },
           builderAuth: ctx.builderAuth,
-          signal: request.signal,
+          signal,
         }),
         TE.mapLeft(normalizeApiFailure),
         TE.chainW(validateWith(MarketplaceOrderResultSchema)),

@@ -191,7 +191,7 @@ describe('demo builder proxy boundary', () => {
       }),
     );
     for (const path of [
-      'v2/redeem/cards',
+      'v2/redeem/collectibles',
       'v2/redeem/orders',
       `v2/redeem/orders/0x${'aa'.repeat(32)}`,
     ]) {
@@ -259,13 +259,13 @@ describe('demo builder proxy boundary', () => {
     expect(
       (
         await GET(
-          new Request(`${origin}/api/renaiss/v2/redeem/cards`, {
+          new Request(`${origin}/api/renaiss/v2/redeem/collectibles`, {
             headers: {
               origin: 'https://other.example',
               authorization: 'Bearer rnws_at_fixture',
             },
           }),
-          context('v2/redeem/cards'),
+          context('v2/redeem/collectibles'),
         )
       ).status,
     ).toBe(403);

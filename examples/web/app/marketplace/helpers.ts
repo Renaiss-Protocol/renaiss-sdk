@@ -22,20 +22,19 @@ export function splitCardName(name: string): SplitCardName {
 }
 
 export function cardDisplayRows(card: {
-  gradingCompany: string;
-  grade: string;
-  year: number;
-  setName: string;
-  cardNumber: string;
-  pokemonName: string;
+  attributes: { key: string; value: string }[];
 }): { firstRow: string[]; secondRow: string } {
+  // The API leaves out empty attributes.
+  const attribute = (key: string) =>
+    card.attributes.find((entry) => entry.key === key)?.value ?? '';
+  const cardNumber = attribute('Card Number');
   return {
     firstRow: [
-      `${card.gradingCompany} ${card.grade}`,
-      String(card.year),
-      card.setName,
-    ],
-    secondRow: `#${card.cardNumber} ${card.pokemonName}`,
+      `${attribute('Grader')} ${attribute('Grade')}`.trim(),
+      attribute('Year'),
+      attribute('Set'),
+    ].filter((row) => row !== ''),
+    secondRow: `${cardNumber ? `#${cardNumber} ` : ''}${attribute('Character')}`,
   };
 }
 
@@ -96,6 +95,24 @@ export function isExpired(iso: string, nowMs: number): boolean {
 export function formatDateTime(iso: string): string {
   const ms = parseIso(iso);
   return ms === null ? iso : new Date(ms).toLocaleString();
+}
+
+// The API refuses an expiry more than 180 days ahead of its own clock.
+const MAX_EXPIRY_SECONDS = 180 * 86_400;
+// Room for a device clock up to ten minutes ahead of the API.
+const MAX_EXPIRY_CLOCK_MARGIN_SECONDS = 600;
+
+/**
+ * Converts an offer duration into the absolute expiry the SDK sends. The
+ * 180-day maximum is shortened by ten minutes so a device clock ahead of the
+ * API does not push it past the cap; shorter durations are exact.
+ */
+export function offerExpiresAt(durationSeconds: number, nowMs: number): Date {
+  const seconds =
+    durationSeconds >= MAX_EXPIRY_SECONDS
+      ? MAX_EXPIRY_SECONDS - MAX_EXPIRY_CLOCK_MARGIN_SECONDS
+      : durationSeconds;
+  return new Date(nowMs + seconds * 1000);
 }
 
 /** Smallest offer the API accepts (1 USDT) in 18-decimal units. */

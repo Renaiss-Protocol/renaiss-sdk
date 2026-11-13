@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BNB_MAINNET,
   BNB_TESTNET,
+  CollectibleType,
   createMarketplaceClient,
   isCreateAskError,
   isListMarketplaceCardsError,
@@ -251,19 +252,10 @@ describe('v2 marketplace boundaries', () => {
           {
             tokenId,
             name: 'Card',
-            setName: 'Set',
-            cardNumber: '1',
-            pokemonName: 'Pikachu',
             ownerAddress: account.address,
             askPriceInUSDT: amount,
-            fmvPriceInUSD: '9007199254740993123',
+            rixPriceInUsd: '9007199254740993123',
             frontImageUrl: 'https://example.com/slab.png',
-            attributes: [],
-            owner: null,
-            vaultLocation: 'platform',
-            gradingCompany: 'PSA',
-            grade: '10',
-            year: 2025,
           },
         ],
         pagination: {
@@ -285,11 +277,64 @@ describe('v2 marketplace boundaries', () => {
     });
     const first = value(await pages.firstPage());
     expect(first.items[0]?.askPriceInUsdt).toBe(amount);
+    expect(first.items[0]?.rixPriceInUsd).toBe('9007199254740993123');
     expect(first.items[0]?.frontImageUrl).toContain('slab');
     expect(first.nextCursor).toBeDefined();
     const all = [];
     for await (const page of pages) all.push(value(page));
     expect(all).toHaveLength(2);
+  });
+  it('sorts by rixPriceInUsd', async () => {
+    const fetch = vi.fn(async (url: string) => {
+      expect(new URL(url).searchParams.get('sortBy')).toBe('rixPriceInUsd');
+      return Response.json({
+        collection: [],
+        pagination: { total: 0, limit: 25, offset: 0, hasMore: false },
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+    value(
+      await client()
+        .listMarketplaceCards({ sortBy: MarketplaceV2Sort.RixPrice })
+        .firstPage(),
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('reads a collectible with its type and attributes, and no FMV as null', async () => {
+    const attributes = [
+      { key: 'Grader', value: 'PSA' },
+      { key: 'Grade', value: '10 Gem Mint' },
+      { key: 'Cert Number', value: '12345678' },
+    ];
+    const fetch = vi.fn(async (url: string) => {
+      expect(new URL(url).pathname).toBe(
+        `/v2/marketplace/collectibles/${tokenId}`,
+      );
+      return Response.json({
+        collectible: {
+          tokenId,
+          type: 'POKEMON',
+          name: 'Card',
+          ownerAddress: account.address,
+          askPriceInUSDT: 'NO-ASK-PRICE',
+          askExpiresAt: null,
+          rixPriceInUsd: 'NO-RIX-PRICE',
+          rixPriceUpdatedAt: null,
+          frontImageUrl: 'https://example.com/slab.png',
+          backImageUrl: 'https://example.com/back.png',
+          attributes,
+          owner: null,
+        },
+        pricing: { top_offer: null, last_sale: null, price_history: [] },
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const card = value(await client().fetchCard({ tokenId }));
+    expect(card.type).toBe(CollectibleType.Pokemon);
+    expect(card.attributes).toEqual(attributes);
+    expect(card.rixPriceInUsd).toBeNull();
+    expect(card.askPriceInUsdt).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('signs an ask directly with the EOA, directly, and submits once', async () => {
     const prepared = ask();
@@ -302,9 +347,19 @@ describe('v2 marketplace boundaries', () => {
         );
         const body = JSON.parse(String(init?.body));
         if (url.endsWith('/prepare')) {
-          expect(body.walletAddress).toBe(account.address.toLowerCase());
+          expect(body).toEqual({
+            walletAddress: account.address.toLowerCase(),
+            tokenId,
+            totalPriceInUsdt: amount,
+            expiresAt: null,
+          });
           return Response.json(prepared);
         }
+        expect(body).toEqual({
+          tokenId,
+          askData: prepared.payload.askData,
+          askSignature: expect.any(String),
+        });
         submissions++;
         const recovered = await recoverTypedDataAddress({
           ...(prepared.typedData as TypedDataDefinition),
@@ -356,7 +411,7 @@ describe('v2 marketplace boundaries', () => {
   it.each([
     false,
     true,
-  ])('pins seller-receives asks to the configured fee (tampered=%s)', async (tampered) => {
+  ])('pins buyer-total asks to the configured fee (tampered=%s)', async (tampered) => {
     const prepared = ask();
     const total = (BigInt(amount) * 10200n) / 10000n;
     prepared.quote = {
@@ -389,7 +444,7 @@ describe('v2 marketplace boundaries', () => {
     );
     const result = await client().createAsk({
       tokenId,
-      sellerReceivesInUsdt: BigInt(amount),
+      totalPriceInUsdt: total,
     });
     expect(isFailed(result)).toBe(tampered);
     expect(signing).toHaveBeenCalledTimes(tampered ? 0 : 1);
@@ -621,6 +676,13 @@ describe('v2 marketplace boundaries', () => {
   }) => {
     const prepared = ask();
     const now = Date.now();
+    // The default is a 30-day preparation; the expired case uses the short fixture.
+    if (offset < 0) {
+      prepared.payload.askData.deadline = String(
+        Math.floor(now / 1000) + 30 * 86400,
+      );
+      prepared.typedData.message.deadline = prepared.payload.askData.deadline;
+    }
     vi.spyOn(Date, 'now').mockReturnValue(now + offset);
     vi.stubGlobal(
       'fetch',
@@ -630,7 +692,7 @@ describe('v2 marketplace boundaries', () => {
     const result = await client().createAsk({
       tokenId,
       totalPriceInUsdt: BigInt(amount),
-      expiresInSeconds: 600,
+      expiresAt: null,
     });
     expect(result).toMatchObject({
       _tag: 'Left',
@@ -688,12 +750,9 @@ describe('v2 marketplace boundaries', () => {
   const day = 86_400_000;
   for (const kind of ['ask', 'bid'] as const) {
     it.each([
-      { form: 'expiresAt', aheadMs: 181 * day, refused: true },
-      { form: 'expiresAt', aheadMs: 180 * day - 60_000, refused: false },
-      { form: 'expiresInSeconds', aheadMs: 181 * day, refused: true },
-      { form: 'expiresInSeconds', aheadMs: 180 * day, refused: false },
-    ])(`caps a ${kind} $form expiry at 180 days (refused=$refused)`, async ({
-      form,
+      { aheadMs: 181 * day, refused: true },
+      { aheadMs: 180 * day - 60_000, refused: false },
+    ])(`caps a ${kind} absolute expiry at 180 days (refused=$refused)`, async ({
       aheadMs,
       refused,
     }) => {
@@ -721,10 +780,7 @@ describe('v2 marketplace boundaries', () => {
       );
       vi.stubGlobal('fetch', fetch);
       const sdk = client();
-      const expiry =
-        form === 'expiresAt'
-          ? { expiresAt: expiresAt.toISOString() }
-          : { expiresInSeconds: aheadMs / 1000 };
+      const expiry = { expiresAt: expiresAt.toISOString() };
       const result =
         kind === 'ask'
           ? await sdk.createAsk({
@@ -749,7 +805,8 @@ describe('v2 marketplace boundaries', () => {
         false,
         true,
       ])(`binds ${operation} expiry (absolute=${absolute}, extended=%s)`, async (extended) => {
-        const requested = Math.floor(Date.now() / 1000) + 600;
+        const requested =
+          Math.floor(Date.now() / 1000) + (absolute ? 600 : 30 * 86400);
         const deadline = String(extended ? requested + 365 * 86400 : requested);
         const preparedAsk = ask();
         preparedAsk.payload.askData.deadline = deadline;
@@ -788,7 +845,7 @@ describe('v2 marketplace boundaries', () => {
         const signing = vi.spyOn(signer, 'signTypedData');
         const expiry = absolute
           ? { expiresAt: new Date(requested * 1000).toISOString() }
-          : { expiresInSeconds: 600 };
+          : { expiresAt: null };
         const sdk = client();
         const result =
           operation === 'ask'
@@ -820,5 +877,171 @@ describe('v2 marketplace boundaries', () => {
         signing.mockRestore();
       });
     }
+  }
+  // Retired beta.4 keys must fail loudly rather than be stripped into a default 30-day order.
+  it.each([
+    {
+      operation: 'ask',
+      key: 'expiresInSeconds',
+      retired: { expiresInSeconds: 300 },
+    },
+    {
+      operation: 'ask',
+      key: 'sellerReceivesInUsdt',
+      retired: { sellerReceivesInUsdt: BigInt(amount) },
+    },
+    {
+      operation: 'bid',
+      key: 'expiresInSeconds',
+      retired: { expiresInSeconds: 300 },
+    },
+    {
+      operation: 'buy',
+      key: 'expiresInSeconds',
+      retired: { expiresInSeconds: 300 },
+    },
+    {
+      operation: 'sell',
+      key: 'expiresInSeconds',
+      retired: { expiresInSeconds: 300 },
+    },
+  ] as const)('rejects the retired $operation key $key before I/O', async ({
+    operation,
+    retired,
+  }) => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const signing = vi.fn();
+    const sdk = createMarketplaceClient({
+      baseUrl: 'https://api.example',
+      signer: { ...signer, signTypedData: signing },
+      expectedChainId: 97,
+    });
+    const result =
+      operation === 'ask'
+        ? await sdk.createAsk({
+            tokenId,
+            totalPriceInUsdt: BigInt(amount),
+            ...retired,
+          } as never)
+        : operation === 'bid'
+          ? await sdk.createBid({
+              tokenId,
+              amountInUsdt: BigInt(amount),
+              ...retired,
+            } as never)
+          : operation === 'buy'
+            ? await sdk.buyCard({
+                tokenId,
+                expectedTotalPriceInUsdt: BigInt(amount),
+                ...retired,
+              } as never)
+            : await sdk.acceptBid({
+                tokenId,
+                bidId: id,
+                expectedTotalPriceInUsdt: BigInt(amount),
+                ...retired,
+              } as never);
+    expect(isFailed(result)).toBe(true);
+    if (isFailed(result))
+      expect(getError(result).code).toBe('WRONG_REQUEST_PARAMS');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(signing).not.toHaveBeenCalled();
+  });
+  it.each([
+    'ask',
+    'bid',
+    'buy',
+    'sell',
+  ] as const)('forwards the caller signal to both %s requests', async (operation) => {
+    const base = ask();
+    const prepared =
+      operation === 'ask'
+        ? base
+        : operation === 'bid'
+          ? bid()
+          : operation === 'buy'
+            ? { ...bid(), operation: 'buy' }
+            : {
+                ...base,
+                operation: 'sell',
+                payload: { ...base.payload, bidOrderId: id },
+                quote: {
+                  ...base.quote,
+                  bidOrderId: id,
+                  bidderWalletAddress: contract,
+                  amountInUsdt: amount,
+                },
+              };
+    const fetch = vi.fn(async (url: string, _init?: RequestInit) =>
+      Response.json(
+        url.endsWith('/prepare')
+          ? prepared
+          : { operation, orderId: id, status: 'ACTIVE', executed: false },
+      ),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const { signal } = new AbortController();
+    const sdk = client();
+    const result =
+      operation === 'ask'
+        ? await sdk.createAsk({
+            tokenId,
+            totalPriceInUsdt: BigInt(amount),
+            signal,
+          })
+        : operation === 'bid'
+          ? await sdk.createBid({
+              tokenId,
+              amountInUsdt: BigInt(amount),
+              signal,
+            })
+          : operation === 'buy'
+            ? await sdk.buyCard({
+                tokenId,
+                expectedTotalPriceInUsdt: BigInt(amount),
+                signal,
+              })
+            : await sdk.acceptBid({
+                tokenId,
+                bidId: id,
+                expectedTotalPriceInUsdt: BigInt(amount),
+                signal,
+              });
+    expect(isFailed(result)).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[0]?.[0]).toMatch(/\/prepare$/);
+    expect(fetch.mock.calls[1]?.[0]).not.toMatch(/\/prepare$/);
+    for (const [, init] of fetch.mock.calls) expect(init?.signal).toBe(signal);
+  });
+  // Runtime JS callers can pass anything; a malformed request is a value, not a throw.
+  for (const operation of ['ask', 'bid', 'buy', 'sell'] as const) {
+    it.each([
+      null,
+      undefined,
+      42,
+      'tokenId',
+    ])(`returns WRONG_REQUEST_PARAMS for a ${operation} request of %j`, async (request) => {
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      const signing = vi.fn();
+      const sdk = createMarketplaceClient({
+        baseUrl: 'https://api.example',
+        signer: { ...signer, signTypedData: signing },
+        expectedChainId: 97,
+      });
+      const result = await (operation === 'ask'
+        ? sdk.createAsk(request as never)
+        : operation === 'bid'
+          ? sdk.createBid(request as never)
+          : operation === 'buy'
+            ? sdk.buyCard(request as never)
+            : sdk.acceptBid(request as never));
+      expect(isFailed(result)).toBe(true);
+      if (isFailed(result))
+        expect(getError(result).code).toBe('WRONG_REQUEST_PARAMS');
+      expect(fetch).not.toHaveBeenCalled();
+      expect(signing).not.toHaveBeenCalled();
+    });
   }
 });
